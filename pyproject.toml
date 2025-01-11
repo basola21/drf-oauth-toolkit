@@ -1,0 +1,61 @@
+[tool.black]
+line-length = 99
+skip-string-normalization = true
+target-version = ['py310']
+
+
+[tool.isort]
+profile = "black"
+line_length = 99
+multi_line_output = 3
+skip = ["**/migrations/*", "venv", "__pycache__", "build", "dist"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+exclude = [
+    "migrations",
+    "venv",
+    "__pycache__",
+    "build",
+    "dist",]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "drf_oauth_toolkit.settings"
+pythonpath = "."
+testpaths = ["tests"]
+
+[tool.poetry]
+name = "drf-oauth-toolkit"
+version = "0.1.0"
+description = "A toolkit for handling OAuth with Django Rest Framework"
+authors = ["Basel Mahmoud <basel.mahmoud@arkleap.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+djangorestframework-simplejwt = "^5.4.0"
+pyjwt = "^2.10.1"
+django = "^5.1.4"
+djangorestframework = "^3.15.2"
+requests = "^2.32.3"
+attrs = "^24.3.0"
+oauthlib = "^3.2.2"
+types-requests = "^2.32.0.20241016"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.4"
+pytest-django = "^4.9.0"
+pytest-mock = "^3.14.0"
+flake8 = "^7.1.1"
+black = "^24.10.0"
+mypy = "^1.14.1"
+isort = "^5.13.2"
+pre-commit = "^4.0.1"
+setuptools = "^75.8.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
