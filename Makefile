@@ -1,4 +1,4 @@
-a# Variables
+# Variables
 POETRY = poetry
 
 # Install all dependencies and pre-commit hooks
@@ -19,10 +19,11 @@ mypy:
 # Run all tests
 .PHONY: test
 
-# Assumes tests are handled by pytest
-# Modify if using another framework
 test:
 	$(POETRY) run pytest
+
+cov:
+	$(POETRY) run pytest --cov=drf_oauth_toolkit
 
 # Run pre-commit on all files
 pre-commit:

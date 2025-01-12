@@ -5,11 +5,11 @@ from urllib.parse import urlencode
 
 import jwt
 import requests
-from django.conf import settings
 from django.urls import reverse_lazy
 from oauthlib.common import UNICODE_ASCII_CHARACTER_SET
 
 from drf_oauth_toolkit.exceptions import OAuthException, TokenValidationError
+from drf_oauth_toolkit.utils.settings_loader import get_nested_setting
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,7 @@ class OAuthServiceBase:
         return value
 
     def _get_redirect_uri(self) -> str:
-        domain = settings.HOST
+        domain = get_nested_setting(["OAUTH_CREDENTIALS", "host"])
         return f"{domain}{self.API_URI}"
 
     def get_authorization_url(self, request) -> Tuple[str, str]:
