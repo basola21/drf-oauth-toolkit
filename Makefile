@@ -19,8 +19,6 @@ mypy:
 # Run all tests
 .PHONY: test
 
-# Assumes tests are handled by pytest
-# Modify if using another framework
 test:
 	$(POETRY) run pytest
 
