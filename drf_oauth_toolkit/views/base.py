@@ -130,7 +130,7 @@ class OAuthCallbackApiBase(PublicApi):
             logger.exception(f"OAuth flow failed: {e}")
             raise OAuthException()
 
-        self.update_account(user, oauth_tokens)
+        user = self.update_account(user, oauth_tokens)
 
         return self.generate_success_response(user, oauth_tokens)
 

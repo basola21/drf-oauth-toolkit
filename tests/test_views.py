@@ -134,6 +134,7 @@ class TestOAuthCallbackApiBase:
             def update_account(self, user, oauth_tokens):
                 user.oauth_access_token = oauth_tokens.access_token
                 user.save()
+                return user
 
         # Create a user and a valid JWT
         user = User.objects.create_user(username="testuser")
