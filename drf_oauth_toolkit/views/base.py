@@ -7,9 +7,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
-from services.base import OAuthServiceBase
 
 from drf_oauth_toolkit.exceptions import CSRFValidationError, OAuthException, TokenValidationError
+from drf_oauth_toolkit.services.base import OAuthServiceBase
 from drf_oauth_toolkit.utils.commons import PublicApi
 
 logger = logging.getLogger(__name__)

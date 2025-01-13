@@ -8,6 +8,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
+test_lib_project/
 
 # C extensions
 *.so
