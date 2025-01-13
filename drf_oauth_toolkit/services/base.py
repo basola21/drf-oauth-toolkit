@@ -26,10 +26,12 @@ class OAuthTokens:
         access_token: str,
         refresh_token: Optional[str] = None,
         id_token: Optional[str] = None,
+        expires_in: Optional[int] = 90,
     ) -> None:
         self.access_token = access_token
         self.refresh_token = refresh_token
         self.id_token = id_token
+        self.expires_in = expires_in
 
     def decode_id_token(self) -> Dict[str, Any]:
         if not self.id_token:
@@ -53,7 +55,7 @@ class OAuthServiceBase:
         raise NotImplementedError("Subclasses must implement this method.")
 
     @staticmethod
-    def _generate_state_session_token(length=30, chars=UNICODE_ASCII_CHARACTER_SET) -> str:
+    def _generate_state_session_token(length: int = 30, chars=UNICODE_ASCII_CHARACTER_SET) -> str:
         rand = SystemRandom()
         return "".join(rand.choice(chars) for _ in range(length))
 
