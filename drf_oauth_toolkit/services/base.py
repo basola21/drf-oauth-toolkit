@@ -5,11 +5,11 @@ from urllib.parse import urlencode
 
 import jwt
 import requests
-from django.conf import settings
 from django.urls import reverse_lazy
 from oauthlib.common import UNICODE_ASCII_CHARACTER_SET
 
 from drf_oauth_toolkit.exceptions import OAuthException, TokenValidationError
+from drf_oauth_toolkit.utils.settings_loader import get_nested_setting
 
 logger = logging.getLogger(__name__)
 
@@ -26,10 +26,12 @@ class OAuthTokens:
         access_token: str,
         refresh_token: Optional[str] = None,
         id_token: Optional[str] = None,
+        expires_in: Optional[int] = 90,
     ) -> None:
         self.access_token = access_token
         self.refresh_token = refresh_token
         self.id_token = id_token
+        self.expires_in = expires_in
 
     def decode_id_token(self) -> Dict[str, Any]:
         if not self.id_token:
@@ -53,7 +55,7 @@ class OAuthServiceBase:
         raise NotImplementedError("Subclasses must implement this method.")
 
     @staticmethod
-    def _generate_state_session_token(length=30, chars=UNICODE_ASCII_CHARACTER_SET) -> str:
+    def _generate_state_session_token(length: int = 30, chars=UNICODE_ASCII_CHARACTER_SET) -> str:
         rand = SystemRandom()
         return "".join(rand.choice(chars) for _ in range(length))
 
@@ -71,7 +73,7 @@ class OAuthServiceBase:
         return value
 
     def _get_redirect_uri(self) -> str:
-        domain = settings.HOST
+        domain = get_nested_setting(["OAUTH_CREDENTIALS", "host"])
         return f"{domain}{self.API_URI}"
 
     def get_authorization_url(self, request) -> Tuple[str, str]:
