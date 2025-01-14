@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import logging
 import time
+from dataclasses import dataclass
 from random import SystemRandom
 from typing import Any, Dict, Optional, Tuple
 from urllib.parse import parse_qsl, quote, urlencode
@@ -18,24 +19,32 @@ from drf_oauth_toolkit.utils.settings_loader import get_nested_setting
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class OAuth1Credentials:
+    consumer_key: str
+    consumer_secret: str
+
+
+@dataclass
 class OAuth2Credentials:
-    def __init__(self, client_id: str, client_secret: str) -> None:
-        self.client_id = client_id
-        self.client_secret = client_secret
+    client_id: str
+    client_secret: str
 
 
+@dataclass
+class OAuth1Tokens:
+    oauth_token: str
+    oauth_token_secret: str
+    user_id: Optional[str] = None
+    screen_name: Optional[str] = None
+
+
+@dataclass
 class OAuth2Tokens:
-    def __init__(
-        self,
-        access_token: str,
-        refresh_token: Optional[str] = None,
-        id_token: Optional[str] = None,
-        expires_in: Optional[int] = 90,
-    ) -> None:
-        self.access_token = access_token
-        self.refresh_token = refresh_token
-        self.id_token = id_token
-        self.expires_in = expires_in
+    access_token: str
+    refresh_token: Optional[str] = None
+    id_token: Optional[str] = None
+    expires_in: Optional[int] = 90
 
     def decode_id_token(self) -> Dict[str, Any]:
         if not self.id_token:
@@ -60,7 +69,7 @@ class OAuthBase:
     def get_authorization_params(self, redirect_uri: str, state: str, request) -> Dict[str, Any]:
         raise NotImplementedError("Subclasses must implement this method.")
 
-    def get_credentials(self) -> OAuth2Credentials:
+    def get_credentials(self) -> OAuth2Credentials | OAuth1Credentials:
         raise NotImplementedError("Subclasses must implement this method.")
 
     def get_tokens(self, *, code: str, state, request) -> OAuth2Tokens:
@@ -182,7 +191,7 @@ class OAuth1ServiceBase(OAuthBase):
 
         return dict(parse_qsl(response.text))
 
-    def get_access_token(self, oauth_token: str, oauth_verifier: str) -> Dict[str, str]:
+    def get_access_token(self, oauth_token: str, oauth_verifier: str) -> OAuth1Tokens:
         oauth_params = self._get_oauth1_params()
         oauth_params.update(
             {
@@ -196,12 +205,20 @@ class OAuth1ServiceBase(OAuthBase):
             params=oauth_params,
         )
         headers = {"Authorization": f"OAuth {self._format_oauth_header(oauth_params)}"}
-
         response = requests.post(self.ACCESS_TOKEN_URL, headers=headers)
+
         if not response.ok:
             raise OAuthException(f"Failed to obtain access token: {response.text}")
 
-        return dict(parse_qsl(response.text))
+        # Parse the response; typically you’ll get oauth_token and oauth_token_secret
+        token_data = dict(parse_qsl(response.text))
+
+        return OAuth1Tokens(
+            oauth_token=token_data["oauth_token"],
+            oauth_token_secret=token_data["oauth_token_secret"],
+            user_id=token_data.get("user_id"),
+            screen_name=token_data.get("screen_name"),
+        )
 
     def _get_oauth1_params(self, callback_url: str = "") -> Dict[str, str]:
         return {
