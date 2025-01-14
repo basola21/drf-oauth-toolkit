@@ -8,7 +8,7 @@ from django.utils.timezone import now
 from model_bakery import baker
 
 from drf_oauth_toolkit.models import OAuth2Token, ServiceChoices
-from drf_oauth_toolkit.services.base import OAuthTokens
+from drf_oauth_toolkit.services.base import OAuth2Tokens
 
 
 def gen_random_access_token():
@@ -52,7 +52,7 @@ class TestModelOauth2Token:
 
     def test_update_or_create_token(self):
         user = baker.make('auth.User')
-        token_data = OAuthTokens(
+        token_data = OAuth2Tokens(
             gen_random_access_token(), gen_random_access_token(), expires_in=80
         )
         token = OAuth2Token.objects.update_or_create_token(

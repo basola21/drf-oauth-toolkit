@@ -1,10 +1,10 @@
 from typing import Any, Dict
 
-from drf_oauth_toolkit.services.base import OAuthCredentials, OAuthServiceBase
+from drf_oauth_toolkit.services.base import OAuth2Credentials, OAuth2ServiceBase
 from drf_oauth_toolkit.utils.settings_loader import get_nested_setting
 
 
-class GoogleOAuthService(OAuthServiceBase):
+class GoogleOAuthService(OAuth2ServiceBase):
     API_URI_NAME = get_nested_setting(["OAUTH_CREDENTIALS", "google", "callback_url"])
     AUTHORIZATION_URL = "https://accounts.google.com/o/oauth2/auth"
     TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -14,8 +14,8 @@ class GoogleOAuthService(OAuthServiceBase):
         "https://www.googleapis.com/auth/userinfo.profile",
     ]
 
-    def get_credentials(self) -> OAuthCredentials:
-        return OAuthCredentials(
+    def get_credentials(self) -> OAuth2Credentials:
+        return OAuth2Credentials(
             client_id=get_nested_setting(["OAUTH_CREDENTIALS", "google", "client_id"]),
             client_secret=get_nested_setting(["OAUTH_CREDENTIALS", "google", "client_secret"]),
         )

@@ -1,7 +1,11 @@
+import base64
+import hashlib
+import hmac
 import logging
+import time
 from random import SystemRandom
 from typing import Any, Dict, Optional, Tuple
-from urllib.parse import urlencode
+from urllib.parse import parse_qsl, quote, urlencode
 
 import jwt
 import requests
@@ -14,13 +18,13 @@ from drf_oauth_toolkit.utils.settings_loader import get_nested_setting
 logger = logging.getLogger(__name__)
 
 
-class OAuthCredentials:
+class OAuth2Credentials:
     def __init__(self, client_id: str, client_secret: str) -> None:
         self.client_id = client_id
         self.client_secret = client_secret
 
 
-class OAuthTokens:
+class OAuth2Tokens:
     def __init__(
         self,
         access_token: str,
@@ -40,41 +44,38 @@ class OAuthTokens:
         return decoded_token
 
 
-class OAuthServiceBase:
+class OAuthBase:
+    """
+    Abstract base class for both OAuth 1.0a and OAuth 2.0 strategies.
+    """
+
     API_URI_NAME: str
     AUTHORIZATION_URL: str
-    TOKEN_URL: str
     USER_INFO_URL: str
+
+    def _get_redirect_uri(self) -> str:
+        domain = get_nested_setting(["OAUTH_CREDENTIALS", "host"])
+        return f"{domain}{reverse_lazy(self.API_URI_NAME)}"
+
+    def get_authorization_params(self, redirect_uri: str, state: str, request) -> Dict[str, Any]:
+        raise NotImplementedError("Subclasses must implement this method.")
+
+    def get_credentials(self) -> OAuth2Credentials:
+        raise NotImplementedError("Subclasses must implement this method.")
+
+    def get_tokens(self, *, code: str, state, request) -> OAuth2Tokens:
+        raise NotImplementedError
+
+    def get_user_info(self, *, oauth_tokens: OAuth2Tokens) -> Dict[str, Any]:
+        raise NotImplementedError
+
+
+class OAuth2ServiceBase(OAuthBase):
+    TOKEN_URL: str
     SCOPES: list
 
     def __init__(self):
         self._credentials = self.get_credentials()
-        self.API_URI = reverse_lazy(self.API_URI_NAME)
-
-    def get_credentials(self) -> OAuthCredentials:
-        raise NotImplementedError("Subclasses must implement this method.")
-
-    @staticmethod
-    def _generate_state_session_token(length: int = 30, chars=UNICODE_ASCII_CHARACTER_SET) -> str:
-        rand = SystemRandom()
-        return "".join(rand.choice(chars) for _ in range(length))
-
-    @staticmethod
-    def _store_in_session(request, key: str, value: Any) -> None:
-        request.session[key] = value
-        request.session.modified = True
-        request.session.save()
-
-    @staticmethod
-    def _retrieve_from_session(request, key: str) -> Any:
-        value = request.session.pop(key, None)
-        if not value:
-            raise OAuthException(f"Missing session value for key: {key}")
-        return value
-
-    def _get_redirect_uri(self) -> str:
-        domain = get_nested_setting(["OAUTH_CREDENTIALS", "host"])
-        return f"{domain}{self.API_URI}"
 
     def get_authorization_url(self, request) -> Tuple[str, str]:
         redirect_uri = self._get_redirect_uri()
@@ -84,13 +85,13 @@ class OAuthServiceBase:
         authorization_url = f"{self.AUTHORIZATION_URL}?{query_params}"
         return authorization_url, state
 
-    def get_authorization_params(self, redirect_uri: str, state: str, request) -> Dict[str, Any]:
-        raise NotImplementedError("Subclasses must implement this method.")
+    def _generate_state_session_token(
+        self, length: int = 30, chars=UNICODE_ASCII_CHARACTER_SET
+    ) -> str:
+        rand = SystemRandom()
+        return "".join(rand.choice(chars) for _ in range(length))
 
-    def get_authorization_headers(self) -> Dict[str, str]:
-        return {"Content-Type": "application/x-www-form-urlencoded"}
-
-    def get_tokens(self, *, code: str, state, request) -> OAuthTokens:
+    def get_tokens(self, *, code: str, state, request) -> OAuth2Tokens:
         redirect_uri = self._get_redirect_uri()
         data = self.get_token_request_data(code, redirect_uri, state, request)
         headers = self.get_authorization_headers()
@@ -98,24 +99,22 @@ class OAuthServiceBase:
         self._validate_response(response)
         return self._parse_token_response(response.json())
 
-    def _parse_token_response(self, response_data: Dict[str, Any]) -> OAuthTokens:
-        return OAuthTokens(
-            access_token=response_data["access_token"],
-            refresh_token=response_data.get("refresh_token"),
-            id_token=response_data.get("id_token"),
-        )
+    def get_authorization_headers(self) -> Dict[str, str]:
+        return {"Content-Type": "application/x-www-form-urlencoded"}
 
     def _validate_response(self, response):
         if not response.ok:
             logger.error(f"Token request failed: {response.text}")
             raise OAuthException(f"Error during token request: {response.text}")
 
-    def get_token_request_data(
-        self, code: str, redirect_uri: str, state: str, request
-    ) -> Dict[str, Any]:
-        raise NotImplementedError("Subclasses must implement this method.")
+    def _parse_token_response(self, response_data: Dict[str, Any]) -> OAuth2Tokens:
+        return OAuth2Tokens(
+            access_token=response_data["access_token"],
+            refresh_token=response_data.get("refresh_token"),
+            id_token=response_data.get("id_token"),
+        )
 
-    def _refresh_access_token(self, oauth_tokens: OAuthTokens) -> None:
+    def _refresh_access_token(self, oauth_tokens: OAuth2Tokens) -> None:
         if not oauth_tokens.refresh_token:
             raise TokenValidationError("Refresh token is missing.")
 
@@ -134,10 +133,92 @@ class OAuthServiceBase:
             "grant_type": "refresh_token",
         }
 
-    def get_user_info(self, *, oauth_tokens: OAuthTokens) -> Dict[str, Any]:
+    def get_user_info(self, *, oauth_tokens: OAuth2Tokens) -> Dict[str, Any]:
         if not self.USER_INFO_URL:
             raise OAuthException("USER_INFO_URL is not defined.")
         headers = {"Authorization": f"Bearer {oauth_tokens.access_token}"}
         response = requests.get(self.USER_INFO_URL, headers=headers)
         self._validate_response(response)
         return response.json()
+
+    @staticmethod
+    def _store_in_session(request, key: str, value: Any) -> None:
+        request.session[key] = value
+        request.session.modified = True
+        request.session.save()
+
+    @staticmethod
+    def _retrieve_from_session(request, key: str) -> Any:
+        value = request.session.pop(key, None)
+        if not value:
+            raise OAuthException(f"Missing session value for key: {key}")
+        return value
+
+    def get_token_request_data(
+        self, code: str, redirect_uri: str, state: str, request
+    ) -> Dict[str, Any]:
+        raise NotImplementedError("Subclasses must implement this method.")
+
+
+class OAuth1ServiceBase(OAuthBase):
+    REQUEST_TOKEN_URL: str
+    ACCESS_TOKEN_URL: str
+
+    def __init__(self):
+        self._credentials = self.get_credentials()
+
+    def get_request_token(self, request) -> Dict[str, str]:
+        oauth_params = self._get_oauth1_params(callback_url=self._get_redirect_uri())
+        oauth_params["oauth_signature"] = self._generate_oauth_signature(
+            method="POST",
+            url=self.REQUEST_TOKEN_URL,
+            params=oauth_params,
+        )
+        headers = {"Authorization": f"OAuth {self._format_oauth_header(oauth_params)}"}
+
+        response = requests.post(self.REQUEST_TOKEN_URL, headers=headers)
+        if not response.ok:
+            raise OAuthException(f"Failed to obtain request token: {response.text}")
+
+        return dict(parse_qsl(response.text))
+
+    def get_access_token(self, oauth_token: str, oauth_verifier: str) -> Dict[str, str]:
+        oauth_params = self._get_oauth1_params()
+        oauth_params.update(
+            {
+                "oauth_token": oauth_token,
+                "oauth_verifier": oauth_verifier,
+            }
+        )
+        oauth_params["oauth_signature"] = self._generate_oauth_signature(
+            method="POST",
+            url=self.ACCESS_TOKEN_URL,
+            params=oauth_params,
+        )
+        headers = {"Authorization": f"OAuth {self._format_oauth_header(oauth_params)}"}
+
+        response = requests.post(self.ACCESS_TOKEN_URL, headers=headers)
+        if not response.ok:
+            raise OAuthException(f"Failed to obtain access token: {response.text}")
+
+        return dict(parse_qsl(response.text))
+
+    def _get_oauth1_params(self, callback_url: str = "") -> Dict[str, str]:
+        return {
+            "oauth_consumer_key": self._credentials.client_id,
+            "oauth_nonce": base64.b64encode(SystemRandom().randbytes(16)).decode(),
+            "oauth_signature_method": "HMAC-SHA1",
+            "oauth_timestamp": str(int(time.time())),
+            "oauth_version": "1.0",
+            "oauth_callback": callback_url,
+        }
+
+    def _generate_oauth_signature(self, method: str, url: str, params: Dict[str, str]) -> str:
+        sorted_params = "&".join(f"{k}={v}" for k, v in sorted(params.items()))
+        base_string = f"{method.upper()}&{quote(url, safe='')}" f"&{quote(sorted_params, safe='')}"
+        signing_key = f"{self._credentials.client_secret}&"
+        signature = hmac.new(signing_key.encode(), base_string.encode(), hashlib.sha1).digest()
+        return base64.b64encode(signature).decode()
+
+    def _format_oauth_header(self, params: Dict[str, str]) -> str:
+        return ", ".join(f'{k}="{v}"' for k, v in params.items())

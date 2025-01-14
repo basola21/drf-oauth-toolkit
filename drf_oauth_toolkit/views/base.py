@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
 from drf_oauth_toolkit.exceptions import CSRFValidationError, OAuthException, TokenValidationError
-from drf_oauth_toolkit.services.base import OAuthServiceBase
+from drf_oauth_toolkit.services.base import OAuth2ServiceBase
 from drf_oauth_toolkit.utils.commons import PublicApi
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ class OAuthRedirectApiBase(PublicApi):
       3. Return the URL for the front-end to redirect the user
     """
 
-    oauth_service_class = OAuthServiceBase
+    oauth_service_class = OAuth2ServiceBase
     session_state_key = ""
 
     def get_authorization_url(self, request):
@@ -80,7 +80,7 @@ class OAuthCallbackApiBase(PublicApi):
       5. Returns a success response (with tokens, user data, etc.)
     """
 
-    oauth_service_class = OAuthServiceBase
+    oauth_service_class = OAuth2ServiceBase
     session_state_key = ""
 
     class InputSerializer(serializers.Serializer):

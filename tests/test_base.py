@@ -4,13 +4,13 @@ import pytest
 from django.http import HttpRequest
 
 from drf_oauth_toolkit.exceptions import OAuthException
-from drf_oauth_toolkit.services.base import OAuthCredentials, OAuthServiceBase, OAuthTokens
+from drf_oauth_toolkit.services.base import OAuth2Credentials, OAuth2ServiceBase, OAuth2Tokens
 
 
-class TestOAuthServiceBase:
+class TestOAuth2ServiceBase:
     @pytest.fixture
     def oauth_service(self):
-        class TestOAuthService(OAuthServiceBase):
+        class TestOAuthService(OAuth2ServiceBase):
             API_URI_NAME = "test_redirect_uri"
             AUTHORIZATION_URL = "https://example.com/auth"
             TOKEN_URL = "https://example.com/token"
@@ -19,7 +19,7 @@ class TestOAuthServiceBase:
                 return self.AUTHORIZATION_URL, "test_state"
 
             def get_credentials(self):
-                return OAuthCredentials(
+                return OAuth2Credentials(
                     client_id="test_client_id", client_secret="test_client_secret"
                 )
 
@@ -77,13 +77,13 @@ class TestOAuthServiceBase:
     @patch("requests.post")
     def test_refresh_access_token_success(self, mock_post, oauth_service):
         mock_post.return_value = Mock(ok=True, json=lambda: {"access_token": "new_access_token"})
-        tokens = OAuthTokens(access_token="expired", refresh_token="valid_refresh_token")
+        tokens = OAuth2Tokens(access_token="expired", refresh_token="valid_refresh_token")
         oauth_service._refresh_access_token(tokens)
         assert tokens.access_token == "new_access_token"
 
     @patch("requests.post")
     def test_refresh_access_token_failure(self, mock_post, oauth_service):
         mock_post.return_value = Mock(ok=False, text="Error occurred")
-        tokens = OAuthTokens(access_token="expired", refresh_token="valid_refresh_token")
+        tokens = OAuth2Tokens(access_token="expired", refresh_token="valid_refresh_token")
         with pytest.raises(OAuthException):
             oauth_service._refresh_access_token(tokens)
