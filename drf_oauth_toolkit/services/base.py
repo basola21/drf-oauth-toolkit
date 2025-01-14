@@ -69,13 +69,13 @@ class OAuthBase:
     def get_authorization_params(self, redirect_uri: str, state: str, request) -> Dict[str, Any]:
         raise NotImplementedError("Subclasses must implement this method.")
 
-    def get_credentials(self) -> OAuth2Credentials | OAuth1Credentials:
+    def get_credentials(self) -> OAuth1Credentials | OAuth2Credentials:
         raise NotImplementedError("Subclasses must implement this method.")
 
-    def get_tokens(self, *, code: str, state, request) -> OAuth2Tokens:
+    def get_tokens(self, *, code: str, state, request) -> OAuth1Tokens | OAuth2Tokens:
         raise NotImplementedError
 
-    def get_user_info(self, *, oauth_tokens: OAuth2Tokens) -> Dict[str, Any]:
+    def get_user_info(self, *, oauth_tokens: OAuth1Tokens | OAuth2Tokens) -> Dict[str, Any]:
         raise NotImplementedError
 
 
@@ -142,9 +142,11 @@ class OAuth2ServiceBase(OAuthBase):
             "grant_type": "refresh_token",
         }
 
-    def get_user_info(self, *, oauth_tokens: OAuth2Tokens) -> Dict[str, Any]:
+    def get_user_info(self, *, oauth_tokens: OAuth1Tokens | OAuth2Tokens) -> Dict[str, Any]:
         if not self.USER_INFO_URL:
             raise OAuthException("USER_INFO_URL is not defined.")
+        if not isinstance(oauth_tokens, OAuth2Tokens):
+            raise TokenValidationError()
         headers = {"Authorization": f"Bearer {oauth_tokens.access_token}"}
         response = requests.get(self.USER_INFO_URL, headers=headers)
         self._validate_response(response)
