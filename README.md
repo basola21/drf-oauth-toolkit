@@ -43,36 +43,26 @@ INSTALLED_APPS = [
 
 ```python
 OAUTH_CREDENTIALS = {
+    "host": "http://127.0.0.1:8000",
+    "encryption_key": "Xcub4xIr71H3VR_PxDQdXAT39H9lM9nE2A0GQBg38Xo=",
     "google": {
-        "client_id": "your-client-id",
-        "client_secret": "your-client-secret",
-        "redirect_uri": "https://yourapp.com/callback",
-    }
+        "client_id": "your google client id",
+        "client_secret": "your google client secert",
+        "callback_url": "google-callback",
+    },
 }
 ```
 
 2. **Extend the base service class** to integrate a provider:
 
 ```python
-from drf_oauth_toolkit.services.base import OAuthServiceBase
+from drf_oauth_toolkit.views.google_views import GoogleOAuthCallbackApi, GoogleOAuthRedirectApi
 
-class GoogleOAuthService(OAuthServiceBase):
-    API_URI_NAME = "google_redirect"
-    AUTHORIZATION_URL = "https://accounts.google.com/o/oauth2/auth"
-    TOKEN_URL = "https://oauth2.googleapis.com/token"
-    USER_INFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
-    SCOPES = ["openid", "email", "profile"]
-```
-
-3. **Use the service in your views:**
-
-```python
-from drf_oauth_toolkit.services.google import GoogleOAuthService
-
-def google_login(request):
-    service = GoogleOAuthService()
-    redirect_url = service.get_authorization_url()
-    return redirect(redirect_url)
+urlpatterns = [
+    ...
+    path("oauth2/google/login", GoogleOAuthRedirectApi.as_view(), name="google-login"),
+    path("oauth2/google/callback", GoogleOAuthCallbackApi.as_view(), name="google-callback"), # sure the url name matches the one in the settings
+]
 ```
 ---
 
@@ -99,34 +89,55 @@ However, the challenge I aim to solve with **`drf-oauth-toolkit`** is the ease o
 
 ### Example: Overriding Token Storage Logic
 
-If you simply want to store tokens after a successful OAuth flow, you can override the base methods like this:
+If you simply want to store tokens after a successful OAuth flow, you should not need to do anything, but in case you have a custom user model
+you can use something like below example:
 
 ```python
-from typing import Any, Dict
-import requests
-from django.conf import settings
-from utils.base_oauth import OAuthCredentials, OAuthServiceBase, OAuthTokens
+from django.contrib.auth import get_user_model
 
-class GoogleOAuthService(OAuthServiceBase):
-    API_URI_NAME = "google_oauth_callback"
-    AUTHORIZATION_URL = "https://accounts.google.com/o/oauth2/auth"
-    TOKEN_URL = "https://oauth2.googleapis.com/token"
-    SCOPES = ["https://www.googleapis.com/auth/userinfo.email"]
+from drf_oauth_toolkit.models import OAuth2Token, ServiceChoices
+from drf_oauth_toolkit.services.google import GoogleOAuthService
+from drf_oauth_toolkit.views.base import OAuthCallbackApiBase
 
-    def get_credentials(self) -> OAuthCredentials:
-        return OAuthCredentials(
-            client_id=settings.GOOGLE_CLIENT_ID,
-            client_secret=settings.GOOGLE_CLIENT_SECRET
+User = get_user_model()
+
+class GoogleOAuthCallbackApi(OAuthCallbackApiBase):
+    oauth_service_class = GoogleOAuthService
+    session_state_key = "google_oauth_state"
+    user_info_email_field = "email"
+    user_info_first_name_field = "given_name"
+    user_info_last_name_field = "family_name"
+
+    def update_account(self, user, oauth_tokens):
+        """
+        Update or create a user account with the given OAuth tokens.
+        """
+        if user is None:
+            user_info = self.oauth_service_class().get_user_info(oauth_tokens=oauth_tokens)
+
+            user = self.create_user_from_oauth(user_info)
+
+        OAuth2Token.objects.update_or_create_token(
+            user=user, service_name=ServiceChoices.GOOGLE, oauth_tokens=oauth_tokens
         )
 
-    def get_token_request_data(self, code: str, redirect_uri: str, state: str, request) -> Dict[str, Any]:
-        return {
-            "code": code,
-            "client_id": self._credentials.client_id,
-            "client_secret": self._credentials.client_secret,
-            "redirect_uri": redirect_uri,
-            "grant_type": "authorization_code"
-        }
+    def create_user_from_oauth(self, user_info):
+        """
+        Create a new user based on the information retrieved from the OAuth service.
+        """
+        email = user_info.get(self.user_info_email_field)
+        first_name = user_info.get(self.user_info_first_name_field, "")
+        last_name = user_info.get(self.user_info_last_name_field, "")
+
+        user, _ = User.objects.get_or_create(
+            email=email,
+            defaults={
+                "first_name": first_name,
+                "last_name": last_name,
+                "username": email.split("@")[0],
+            },
+        )
+        return user
 ```
 
 ---
@@ -153,33 +164,6 @@ class YouTubeOAuthService(GoogleOAuthService):
         )
         response.raise_for_status()
         return response.json()
-```
-
----
-
-## 📊 Flexible View Example
-
-The flexibility extends to how views handle token management and user updates. Here's a `GoogleOAuthCallbackApi` class that handles token saving after authentication:
-
-```python
-from rest_framework.viewsets import GenericViewSet
-from utils.base_oath_view import OAuthCallbackApiBase
-from .models import OAuth2Token
-from .services import GoogleOAuthService
-
-class GoogleOAuthCallbackApi(OAuthCallbackApiBase):
-    oauth_service_class = GoogleOAuthService
-    session_state_key = "google_oauth_state"
-
-    def update_account(self, user, user_info, oauth_tokens):
-        OAuth2Token.objects.update_or_create(
-            user=user,
-            service_name="google",
-            defaults={
-                "access_token": oauth_tokens.access_token,
-                "refresh_token": oauth_tokens.refresh_token,
-            },
-        )
 ```
 
 ---

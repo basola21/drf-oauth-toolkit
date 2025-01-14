@@ -29,7 +29,7 @@ testpaths = ["tests"]
 
 [tool.poetry]
 name = "drf-oauth-toolkit"
-version = "0.1.0"
+version = "0.1.2"
 description = "A toolkit for handling OAuth with Django Rest Framework"
 authors = ["Basel Mahmoud <basel.mahmoud@arkleap.com>"]
 license = "MIT"
