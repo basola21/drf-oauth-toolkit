@@ -132,7 +132,7 @@ class OAuthCallbackApiBase(PublicApi):
 
         user = self.update_account(user, oauth_tokens)
 
-        return self.generate_success_response(user, oauth_tokens)
+        return self.generate_success_response(oauth_tokens)
 
     def _handle_initial_errors(self, validated_data):
         """
@@ -170,7 +170,7 @@ class OAuthCallbackApiBase(PublicApi):
         except (User.DoesNotExist, Exception):
             raise TokenValidationError("Could not validate JWT token to retrieve user.")
 
-    def generate_success_response(self, user, oauth_tokens, **kwargs):
+    def generate_success_response(self, oauth_tokens, **kwargs):
         """
         Construct your own success payload for the front-end.
         """
@@ -178,7 +178,6 @@ class OAuthCallbackApiBase(PublicApi):
             {
                 "access_token": oauth_tokens.access_token,
                 "refresh_token": oauth_tokens.refresh_token,
-                "user_id": user.id if user else None,
                 **kwargs,
             },
             status=status.HTTP_200_OK,

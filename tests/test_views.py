@@ -157,7 +157,6 @@ class TestOAuthCallbackApiBase:
         assert response.status_code == 200
         assert response.data["access_token"] == "mock_access_token"
         assert response.data["refresh_token"] == "mock_refresh_token"
-        assert response.data["user_id"] == user.id
 
     def test_callback_provider_error(self, api_rf, mock_oauth_service):
         """
@@ -253,5 +252,3 @@ class TestOAuthCallbackApiBase:
         data = response.data
         assert data["access_token"] == "mock_access_token"
         assert data["refresh_token"] == "mock_refresh_token"
-        # user_id should be None because user is None
-        assert data["user_id"] is None
