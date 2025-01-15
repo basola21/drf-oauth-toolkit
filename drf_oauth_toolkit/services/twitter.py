@@ -12,15 +12,14 @@ from django.core.exceptions import ImproperlyConfigured
 from django.utils.crypto import get_random_string
 
 from drf_oauth_toolkit.exceptions import OAuthException, TokenValidationError
-from drf_oauth_toolkit.services.base import (
+from drf_oauth_toolkit.services.base import OAuth1ServiceBase, OAuth2ServiceBase
+from drf_oauth_toolkit.utils.settings_loader import get_nested_setting
+from drf_oauth_toolkit.utils.types import (
     OAuth1Credentials,
-    OAuth1ServiceBase,
     OAuth1Tokens,
     OAuth2Credentials,
-    OAuth2ServiceBase,
     OAuth2Tokens,
 )
-from drf_oauth_toolkit.utils.settings_loader import get_nested_setting
 
 logger = logging.getLogger(__name__)
 

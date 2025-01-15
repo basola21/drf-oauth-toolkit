@@ -1,7 +1,8 @@
 from typing import Any, Dict
 
-from drf_oauth_toolkit.services.base import OAuth2Credentials, OAuth2ServiceBase
+from drf_oauth_toolkit.services.base import OAuth2ServiceBase
 from drf_oauth_toolkit.utils.settings_loader import get_nested_setting
+from drf_oauth_toolkit.utils.types import OAuth2Credentials
 
 
 class GoogleOAuthService(OAuth2ServiceBase):

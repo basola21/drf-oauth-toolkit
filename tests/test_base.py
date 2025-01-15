@@ -4,12 +4,8 @@ import pytest
 from django.http import HttpRequest
 
 from drf_oauth_toolkit.exceptions import OAuthException
-from drf_oauth_toolkit.services.base import (
-    OAuth1ServiceBase,
-    OAuth2Credentials,
-    OAuth2ServiceBase,
-    OAuth2Tokens,
-)
+from drf_oauth_toolkit.services.base import OAuth1ServiceBase, OAuth2ServiceBase
+from drf_oauth_toolkit.utils.types import OAuth2Credentials, OAuth2Tokens
 
 
 class TestOAuth2ServiceBase:
@@ -38,7 +34,7 @@ class TestOAuth2ServiceBase:
 
     @patch("requests.post")
     @patch(
-        "drf_oauth_toolkit.services.base.reverse_lazy",
+        "drf_oauth_toolkit.utils.types.reverse_lazy",
         return_value="/test-redirect-uri/",
     )
     def test_get_authorization_url(self, mock_post, mock_reverse, oauth_service):
@@ -50,7 +46,7 @@ class TestOAuth2ServiceBase:
 
     @patch("requests.post")
     @patch(
-        "drf_oauth_toolkit.services.base.reverse_lazy",
+        "drf_oauth_toolkit.utils.types.reverse_lazy",
         return_value="/test-redirect-uri/",
     )
     def test_get_tokens_success(self, mock_reverse, mock_post, oauth_service):
@@ -70,7 +66,7 @@ class TestOAuth2ServiceBase:
 
     @patch("requests.post")
     @patch(
-        "drf_oauth_toolkit.services.base.reverse_lazy",
+        "drf_oauth_toolkit.utils.types.reverse_lazy",
         return_value="/test-redirect-uri/",
     )
     def test_get_tokens_failure(self, mock_reverse, mock_post, oauth_service):

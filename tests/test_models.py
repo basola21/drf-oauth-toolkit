@@ -8,7 +8,7 @@ from django.utils.timezone import now
 from model_bakery import baker
 
 from drf_oauth_toolkit.models import OAuth2Token, ServiceChoices
-from drf_oauth_toolkit.services.base import OAuth2Tokens
+from drf_oauth_toolkit.utils.types import OAuth2Tokens
 
 
 def gen_random_access_token():
