@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient, APIRequestFactory
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from drf_oauth_toolkit.views.base import OAuthCallbackApiBase, OAuthRedirectApiBase
+from drf_oauth_toolkit.views.base import OAuth2CallbackApiBase, OAuth2RedirectApiBase
 
 User = get_user_model()
 
@@ -34,7 +34,7 @@ class TestOAuthRedirectApiBase:
         Patch the oauth_service_class so we don't do real network calls.
         """
         with patch.object(
-            OAuthRedirectApiBase, 'oauth_service_class', autospec=True
+            OAuth2RedirectApiBase, 'oauth_service_class', autospec=True
         ) as mock_class:
             instance = mock_class.return_value
             instance.get_authorization_url.return_value = (
@@ -49,7 +49,7 @@ class TestOAuthRedirectApiBase:
         a valid JWT in the combined state.
         """
 
-        class MyRedirectView(OAuthRedirectApiBase):
+        class MyRedirectView(OAuth2RedirectApiBase):
             session_state_key = "test_redirect_state"
 
         # Create a user and authenticate the request
@@ -84,7 +84,7 @@ class TestOAuthRedirectApiBase:
         If the user is not authenticated, we store `unauthenticated` in place of the JWT.
         """
 
-        class MyRedirectView(OAuthRedirectApiBase):
+        class MyRedirectView(OAuth2RedirectApiBase):
             session_state_key = "test_redirect_state"
 
         request = api_rf.get("/fake-redirect/")
@@ -114,7 +114,7 @@ class TestOAuthCallbackApiBase:
         Patch the oauth_service_class on the Callback Base.
         """
         with patch.object(
-            OAuthCallbackApiBase, 'oauth_service_class', autospec=True
+            OAuth2CallbackApiBase, 'oauth_service_class', autospec=True
         ) as mock_class:
             instance = mock_class.return_value
             instance.get_tokens.return_value = MagicMock(
@@ -128,7 +128,7 @@ class TestOAuthCallbackApiBase:
         can be retrieved from the JWT => success.
         """
 
-        class MyCallbackView(OAuthCallbackApiBase):
+        class MyCallbackView(OAuth2CallbackApiBase):
             session_state_key = "test_callback_state"
 
             def update_account(self, user, oauth_tokens):
@@ -164,7 +164,7 @@ class TestOAuthCallbackApiBase:
         return a 400 error.
         """
 
-        class MyCallbackView(OAuthCallbackApiBase):
+        class MyCallbackView(OAuth2CallbackApiBase):
             def update_account(self, user, oauth_tokens):
                 pass  # Not reached in this scenario
 
@@ -178,7 +178,7 @@ class TestOAuthCallbackApiBase:
         If the stored state doesn't match the one from the query, we raise CSRFValidationError.
         """
 
-        class MyCallbackView(OAuthCallbackApiBase):
+        class MyCallbackView(OAuth2CallbackApiBase):
             session_state_key = "test_callback_state"
 
             def update_account(self, user, oauth_tokens):
@@ -204,7 +204,7 @@ class TestOAuthCallbackApiBase:
         we raise a TokenValidationError => 401 by default in the example code.
         """
 
-        class MyCallbackView(OAuthCallbackApiBase):
+        class MyCallbackView(OAuth2CallbackApiBase):
             session_state_key = "test_callback_state"
 
             def update_account(self, user, oauth_tokens):
@@ -230,7 +230,7 @@ class TestOAuthCallbackApiBase:
         and we can handle that in update_account (e.g., create a new user).
         """
 
-        class MyCallbackView(OAuthCallbackApiBase):
+        class MyCallbackView(OAuth2CallbackApiBase):
             session_state_key = "test_callback_state"
 
             def update_account(self, user, oauth_tokens):

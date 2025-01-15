@@ -2,17 +2,17 @@ from django.contrib.auth import get_user_model
 
 from drf_oauth_toolkit.models import OAuth2Token, ServiceChoices
 from drf_oauth_toolkit.services.google import GoogleOAuthService
-from drf_oauth_toolkit.views.base import OAuthCallbackApiBase, OAuthRedirectApiBase
+from drf_oauth_toolkit.views.base import OAuth2CallbackApiBase, OAuth2RedirectApiBase
 
 User = get_user_model()
 
 
-class GoogleOAuthRedirectApi(OAuthRedirectApiBase):
+class GoogleOAuthRedirectApi(OAuth2RedirectApiBase):
     oauth_service_class = GoogleOAuthService
     session_state_key = "google_oauth_state"
 
 
-class GoogleOAuthCallbackApi(OAuthCallbackApiBase):
+class GoogleOAuthCallbackApi(OAuth2CallbackApiBase):
     oauth_service_class = GoogleOAuthService
     session_state_key = "google_oauth_state"
     user_info_email_field = "email"

@@ -7,15 +7,18 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
 from drf_oauth_toolkit.exceptions import CSRFValidationError, OAuthException, TokenValidationError
-from drf_oauth_toolkit.services.base import OAuth2ServiceBase
+from drf_oauth_toolkit.services.base import OAuth1ServiceBase, OAuth2ServiceBase
 from drf_oauth_toolkit.utils.commons import PublicApi
+
+logger = logging.getLogger(__name__)
+
 
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
 
-class OAuthRedirectApiBase(PublicApi):
+class OAuth2RedirectApiBase(PublicApi):
     """
     Handles the 'redirect' part of the OAuth flow:
       1. Get the authorization URL from the OAuth provider
@@ -70,7 +73,7 @@ class OAuthRedirectApiBase(PublicApi):
         return Response({"authorization_url": authorization_url}, status=status.HTTP_200_OK)
 
 
-class OAuthCallbackApiBase(PublicApi):
+class OAuth2CallbackApiBase(PublicApi):
     """
     Handles the 'callback' part of the OAuth flow:
       1. Receives provider's callback (with code & state or possibly an error).
@@ -182,3 +185,56 @@ class OAuthCallbackApiBase(PublicApi):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class OAuth1RedirectApiBase(PublicApi):
+    """
+    Base class that handles:
+      1) Obtain request token via the service
+      2) Store the token in session (or DB)
+      3) Return the authorization URL for the provider
+    """
+
+    oauth_service_class = OAuth1ServiceBase
+
+    session_token_key = "oauth1_temp_token"
+
+    def store_request_token(self, request, token_data: Dict[str, str]) -> None:
+        """
+        Default: store token_data in the session.
+        If you prefer a DB approach, override this method.
+        """
+        request.session[self.session_token_key] = token_data
+        request.session.modified = True
+
+    def build_authorization_url(self, oauth_token: str) -> str:
+        """
+        The default pattern for OAuth1 is something like:
+            https://provider.com/oauth/authorize?oauth_token={oauth_token}
+        Subclasses can override if the provider's URL requires special params.
+        """
+        service = self.oauth_service_class()
+        return f"{service.AUTHORIZATION_URL}?oauth_token={oauth_token}"
+
+    def get(self, request, *args, **kwargs):
+        try:
+            service = self.oauth_service_class()
+            # Step 1: Get request token
+            token_data = service.get_request_token(request)
+            # token_data should have oauth_token, oauth_token_secret, etc.
+
+            # Step 2: Store token_data (in session by default)
+            self.store_request_token(request, token_data)
+
+            # Step 3: Build the final provider authorization URL
+            oauth_token = token_data["oauth_token"]
+            authorization_url = self.build_authorization_url(oauth_token)
+
+            return Response({"authorization_url": authorization_url}, status=status.HTTP_200_OK)
+
+        except OAuthException as e:
+            logger.exception("OAuth1 request token error")
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.exception("Unexpected error during OAuth1 redirect")
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
