@@ -11,11 +11,10 @@ from drf_oauth_toolkit.exceptions import CSRFValidationError, OAuthException, To
 from drf_oauth_toolkit.models import OAuthRequestToken
 from drf_oauth_toolkit.services.base import OAuth1ServiceBase, OAuth2ServiceBase
 from drf_oauth_toolkit.utils.commons import PublicApi
+from drf_oauth_toolkit.utils.types import OAuth2Tokens
 
 logger = logging.getLogger(__name__)
 
-
-logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -136,8 +135,17 @@ class OAuth2CallbackApiBase(PublicApi):
             raise OAuthException()
 
         user = self.update_account(user, oauth_tokens)
+        oauth_tokens = self.update_oauth_tokens(user) or oauth_tokens
 
         return self.generate_success_response(oauth_tokens)
+
+    def update_oauth_tokens(self, user):
+        if not user:
+            raise NotImplementedError(f"Subclasses must pass a user object not {type(user)}")
+        refresh_token = RefreshToken.for_user(user)
+        access_token = refresh_token.access_token
+        tokens = OAuth2Tokens(str(access_token), str(refresh_token))
+        return tokens
 
     def _handle_initial_errors(self, validated_data):
         """
@@ -166,7 +174,6 @@ class OAuth2CallbackApiBase(PublicApi):
         Otherwise decode the token and retrieve the user.
         """
         if jwt_token == "unauthenticated":
-            # Means no user was logged in at the time of redirect.
             return None
         try:
             decoded_token = AccessToken(jwt_token)

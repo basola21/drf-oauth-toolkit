@@ -31,6 +31,7 @@ class GoogleOAuthCallbackApi(OAuth2CallbackApiBase):
         OAuth2Token.objects.update_or_create_token(
             user=user, service_name=ServiceChoices.GOOGLE, oauth_tokens=oauth_tokens
         )
+        return user
 
     def create_user_from_oauth(self, user_info):
         """

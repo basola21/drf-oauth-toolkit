@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient, APIRequestFactory
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from drf_oauth_toolkit.utils.types import OAuth2Tokens
 from drf_oauth_toolkit.views.base import OAuth2CallbackApiBase, OAuth2RedirectApiBase
 
 User = get_user_model()
@@ -124,24 +125,25 @@ class TestOAuthCallbackApiBase:
 
     def test_callback_no_error_and_valid_state(self, api_rf, mock_oauth_service):
         """
-        If no error, a valid code/state is provided, and the user
-        can be retrieved from the JWT => success.
+        Test callback logic with no error, a valid code/state, and user retrieval.
         """
 
         class MyCallbackView(OAuth2CallbackApiBase):
             session_state_key = "test_callback_state"
 
             def update_account(self, user, oauth_tokens):
-                user.oauth_access_token = oauth_tokens.access_token
-                user.save()
+                user, _ = User.objects.get_or_create(username="testuser")
+
                 return user
 
-        # Create a user and a valid JWT
+            def update_oauth_tokens(self, user):
+                return OAuth2Tokens("mock_access_token", "mock_refresh_token")
+
+        # Create a user and generate valid JWT tokens
         user = User.objects.create_user(username="testuser")
         refresh = RefreshToken.for_user(user)
-        combined_state = f"mocked_state:{refresh.access_token}"
+        combined_state = f"mocked_state:{str(refresh.access_token)}"
 
-        # Mock session data retrieval
         with patch.object(
             MyCallbackView.oauth_service_class,
             '_retrieve_from_session',
@@ -151,9 +153,11 @@ class TestOAuthCallbackApiBase:
                 "/fake-callback/",
                 {"code": "mocked_code", "state": "mocked_state"},
             )
+            request.user = user
 
             response = MyCallbackView.as_view()(request)
 
+        # Assert response and returned tokens
         assert response.status_code == 200
         assert response.data["access_token"] == "mock_access_token"
         assert response.data["refresh_token"] == "mock_refresh_token"
@@ -236,6 +240,9 @@ class TestOAuthCallbackApiBase:
             def update_account(self, user, oauth_tokens):
                 # In real usage, you might create a new user or do something else
                 assert user is None, "Expected user=None for unauthenticated flow"
+
+            def update_oauth_tokens(self, user):
+                return OAuth2Tokens("mock_access_token", "mock_refresh_token")
 
         with patch.object(
             MyCallbackView.oauth_service_class,
