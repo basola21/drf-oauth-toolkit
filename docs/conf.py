@@ -6,24 +6,23 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-from typing import List
-
 project = 'drf_oauth_toolkit'
 copyright = '2025, Basel Rokaya'
 author = 'Basel Rokaya'
-release = '0.1.2'
+release = '0.1.3'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ['sphinx.ext.autodoc']
 
+extensions = [
+    'sphinx.ext.autodoc',
+]
 templates_path = ['_templates']
-exclude_patterns: List = []
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = 'alabaster'
-html_static_path = ['_static']
+html_theme = 'sphinx_rtd_theme'
