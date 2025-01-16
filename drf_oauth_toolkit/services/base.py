@@ -177,4 +177,4 @@ class OAuth1ServiceBase(OAuthBase):
         return base64.b64encode(signature).decode()
 
     def _format_oauth_header(self, params: Dict[str, str]) -> str:
-        return ", ".join(f'{k}="{v}"' for k, v in params.items())
+        return ", ".join(f'{key}="{value}"' for key, value in params.items())
