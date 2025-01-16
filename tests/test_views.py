@@ -5,7 +5,8 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient, APIRequestFactory
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from drf_oauth_toolkit.views.base import OAuthCallbackApiBase, OAuthRedirectApiBase
+from drf_oauth_toolkit.utils.types import OAuth2Tokens
+from drf_oauth_toolkit.views.base import OAuth2CallbackApiBase, OAuth2RedirectApiBase
 
 User = get_user_model()
 
@@ -34,7 +35,7 @@ class TestOAuthRedirectApiBase:
         Patch the oauth_service_class so we don't do real network calls.
         """
         with patch.object(
-            OAuthRedirectApiBase, 'oauth_service_class', autospec=True
+            OAuth2RedirectApiBase, 'oauth_service_class', autospec=True
         ) as mock_class:
             instance = mock_class.return_value
             instance.get_authorization_url.return_value = (
@@ -49,7 +50,7 @@ class TestOAuthRedirectApiBase:
         a valid JWT in the combined state.
         """
 
-        class MyRedirectView(OAuthRedirectApiBase):
+        class MyRedirectView(OAuth2RedirectApiBase):
             session_state_key = "test_redirect_state"
 
         # Create a user and authenticate the request
@@ -84,7 +85,7 @@ class TestOAuthRedirectApiBase:
         If the user is not authenticated, we store `unauthenticated` in place of the JWT.
         """
 
-        class MyRedirectView(OAuthRedirectApiBase):
+        class MyRedirectView(OAuth2RedirectApiBase):
             session_state_key = "test_redirect_state"
 
         request = api_rf.get("/fake-redirect/")
@@ -114,7 +115,7 @@ class TestOAuthCallbackApiBase:
         Patch the oauth_service_class on the Callback Base.
         """
         with patch.object(
-            OAuthCallbackApiBase, 'oauth_service_class', autospec=True
+            OAuth2CallbackApiBase, 'oauth_service_class', autospec=True
         ) as mock_class:
             instance = mock_class.return_value
             instance.get_tokens.return_value = MagicMock(
@@ -124,24 +125,25 @@ class TestOAuthCallbackApiBase:
 
     def test_callback_no_error_and_valid_state(self, api_rf, mock_oauth_service):
         """
-        If no error, a valid code/state is provided, and the user
-        can be retrieved from the JWT => success.
+        Test callback logic with no error, a valid code/state, and user retrieval.
         """
 
-        class MyCallbackView(OAuthCallbackApiBase):
+        class MyCallbackView(OAuth2CallbackApiBase):
             session_state_key = "test_callback_state"
 
             def update_account(self, user, oauth_tokens):
-                user.oauth_access_token = oauth_tokens.access_token
-                user.save()
+                user, _ = User.objects.get_or_create(username="testuser")
+
                 return user
 
-        # Create a user and a valid JWT
+            def update_oauth_tokens(self, user):
+                return OAuth2Tokens("mock_access_token", "mock_refresh_token")
+
+        # Create a user and generate valid JWT tokens
         user = User.objects.create_user(username="testuser")
         refresh = RefreshToken.for_user(user)
-        combined_state = f"mocked_state:{refresh.access_token}"
+        combined_state = f"mocked_state:{str(refresh.access_token)}"
 
-        # Mock session data retrieval
         with patch.object(
             MyCallbackView.oauth_service_class,
             '_retrieve_from_session',
@@ -151,13 +153,14 @@ class TestOAuthCallbackApiBase:
                 "/fake-callback/",
                 {"code": "mocked_code", "state": "mocked_state"},
             )
+            request.user = user
 
             response = MyCallbackView.as_view()(request)
 
+        # Assert response and returned tokens
         assert response.status_code == 200
         assert response.data["access_token"] == "mock_access_token"
         assert response.data["refresh_token"] == "mock_refresh_token"
-        assert response.data["user_id"] == user.id
 
     def test_callback_provider_error(self, api_rf, mock_oauth_service):
         """
@@ -165,7 +168,7 @@ class TestOAuthCallbackApiBase:
         return a 400 error.
         """
 
-        class MyCallbackView(OAuthCallbackApiBase):
+        class MyCallbackView(OAuth2CallbackApiBase):
             def update_account(self, user, oauth_tokens):
                 pass  # Not reached in this scenario
 
@@ -179,7 +182,7 @@ class TestOAuthCallbackApiBase:
         If the stored state doesn't match the one from the query, we raise CSRFValidationError.
         """
 
-        class MyCallbackView(OAuthCallbackApiBase):
+        class MyCallbackView(OAuth2CallbackApiBase):
             session_state_key = "test_callback_state"
 
             def update_account(self, user, oauth_tokens):
@@ -205,7 +208,7 @@ class TestOAuthCallbackApiBase:
         we raise a TokenValidationError => 401 by default in the example code.
         """
 
-        class MyCallbackView(OAuthCallbackApiBase):
+        class MyCallbackView(OAuth2CallbackApiBase):
             session_state_key = "test_callback_state"
 
             def update_account(self, user, oauth_tokens):
@@ -231,12 +234,15 @@ class TestOAuthCallbackApiBase:
         and we can handle that in update_account (e.g., create a new user).
         """
 
-        class MyCallbackView(OAuthCallbackApiBase):
+        class MyCallbackView(OAuth2CallbackApiBase):
             session_state_key = "test_callback_state"
 
             def update_account(self, user, oauth_tokens):
                 # In real usage, you might create a new user or do something else
                 assert user is None, "Expected user=None for unauthenticated flow"
+
+            def update_oauth_tokens(self, user):
+                return OAuth2Tokens("mock_access_token", "mock_refresh_token")
 
         with patch.object(
             MyCallbackView.oauth_service_class,
@@ -253,5 +259,3 @@ class TestOAuthCallbackApiBase:
         data = response.data
         assert data["access_token"] == "mock_access_token"
         assert data["refresh_token"] == "mock_refresh_token"
-        # user_id should be None because user is None
-        assert data["user_id"] is None

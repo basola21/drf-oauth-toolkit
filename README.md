@@ -65,6 +65,20 @@ urlpatterns = [
 ]
 ```
 ---
+## Flow
+The OAuth2 flow for the `drf-oauth-toolkit` is visualized in the following diagram. It highlights the key steps involved in the authentication and token exchange process:
+[![](https://mermaid.ink/img/pako:eNqNU19rwjAQ_ypHHoaCU9hjHwRhsqcxcWwPoyAhPW2wJt0ldRvid98lsdPZKetTc_z-3SW3E8oWKDLh8L1Bo_BeyxXJTW6Av1qS10rX0nh4cUjd6mQ26xafJo0v72BGdquLwEqQoHA7HjMlg1FlV9pAj7DQhMoDBX_n-wnKGEae6WQwb9Ef2pegKo3GL3QxAKdsjcPhMLHPeKwUrAM9eoBiV2ZqWTnopSBRsD4Q-r_ydlJMjUc6FbnkGjudo2_IQBjzyNs1mqsdTj9VKc0KIx6WlkAqhc4tIhVueE5LQlcuTqSuGrufriBS3Kl9xD2gQZIeobJKVv_wS9x2pLG7RE0G0EsSg5bb_-sBtHfB6TzfKBaMdrYhhekuumE6wV9lpYtj8AsJD2M5yuslbAMzN2IgNkgbqQtegF2g5sKXuMFcZPxbSFrnIjd7xsnG2-cvo0TmqcGBINusyvbQ1CHGYXNEtuQnwVVehTdrj2d-u97SY1q3uHX7bxAgMCg?type=png)](https://mermaid.live/edit#pako:eNqNU19rwjAQ_ypHHoaCU9hjHwRhsqcxcWwPoyAhPW2wJt0ldRvid98lsdPZKetTc_z-3SW3E8oWKDLh8L1Bo_BeyxXJTW6Av1qS10rX0nh4cUjd6mQ26xafJo0v72BGdquLwEqQoHA7HjMlg1FlV9pAj7DQhMoDBX_n-wnKGEae6WQwb9Ef2pegKo3GL3QxAKdsjcPhMLHPeKwUrAM9eoBiV2ZqWTnopSBRsD4Q-r_ydlJMjUc6FbnkGjudo2_IQBjzyNs1mqsdTj9VKc0KIx6WlkAqhc4tIhVueE5LQlcuTqSuGrufriBS3Kl9xD2gQZIeobJKVv_wS9x2pLG7RE0G0EsSg5bb_-sBtHfB6TzfKBaMdrYhhekuumE6wV9lpYtj8AsJD2M5yuslbAMzN2IgNkgbqQtegF2g5sKXuMFcZPxbSFrnIjd7xsnG2-cvo0TmqcGBINusyvbQ1CHGYXNEtuQnwVVehTdrj2d-u97SY1q3uHX7bxAgMCg)
+
+### Steps in the Flow:
+1. **User Initiates Login**: The user begins the login process by clicking on an OAuth provider button (e.g., Google Login).
+2. **Redirect to OAuth Provider**: The user is redirected to the OAuth provider's authorization page to authenticate.
+3. **Authorization Grant**: The OAuth provider prompts the user to approve the requested scopes and grant access.
+4. **Authorization Code**: After approval, the OAuth provider redirects back to the callback URL with an authorization code.
+5. **Token Exchange**: The authorization code is exchanged for access and refresh tokens via the provider's token endpoint.
+6. **Token Storage**: The tokens are securely stored in the backend for future use.
+7. **Authenticated Access**: The user gains authenticated access to the application.
+
+This process ensures secure integration of OAuth2 providers with Django Rest Framework applications while allowing full flexibility for customization.
 
 ## 🎯 Inspiration
 

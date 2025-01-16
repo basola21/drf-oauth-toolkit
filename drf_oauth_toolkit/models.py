@@ -4,7 +4,18 @@ from django.conf import settings
 from django.db import models
 from django.utils.timezone import now
 
+from drf_oauth_toolkit.exceptions import NotFoundError
 from drf_oauth_toolkit.utils.fields import EncryptedField
+
+
+class BaseModel(models.Model):
+    class DoesNotExist(NotFoundError):
+        pass
+
+    objects = models.Manager()
+
+    class Meta:
+        abstract = True
 
 
 class OAuth2TokenQuerySet(models.QuerySet):
@@ -37,9 +48,10 @@ class OAuth2TokenManager(models.Manager):
 
 class ServiceChoices(models.TextChoices):
     GOOGLE = "google", "Google"
+    TWITTER = "twitter", "Twitter"
 
 
-class OAuth2Token(models.Model):
+class OAuth2Token(BaseModel):
     """
     A unified token model that can store OAuth2 tokens for multiple services,
     using extendable choices.
@@ -76,3 +88,85 @@ class OAuth2Token(models.Model):
 
     def __str__(self):
         return f"{self.user} - {self.service_name} Token"
+
+
+class OAuthRequestTokenManager(models.Manager):
+    def store_token(self, user, request_token, request_token_secret):
+        """
+        Stores or updates an OAuth request token and secret for the given user.
+
+        Parameters:
+        - user: User instance (optional, can be None for unauthenticated users).
+        - request_token: The OAuth request token string.
+        - request_token_secret: The OAuth request token secret string.
+
+        """
+        return self.update_or_create(
+            request_token=request_token,
+            defaults={
+                "user": user,
+                "request_token_secret": request_token_secret,
+            },
+        )
+
+    # TODO: this will be used as part of the celery beat
+    def cleanup_expired_tokens(self, expiration_time: timedelta):
+        """
+        Deletes tokens that are older than the specified expiration time.
+
+        Parameters:
+        - expiration_time: A `timedelta` specifying the token validity duration.
+
+        Returns:
+        - Number of deleted rows.
+        """
+        threshold = now() - expiration_time
+        return self.filter(created_at__lt=threshold).delete()
+
+
+class OAuthRequestToken(BaseModel):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL
+    )
+    request_token = EncryptedField(max_length=255, unique=True)
+    request_token_secret = EncryptedField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    objects = OAuthRequestTokenManager()
+
+    def __str__(self):
+        return f"Token for user={self.user} token={self.request_token}"
+
+
+class OAuth1TokenManager(models.Manager):
+    def update_or_create_token(self, user, service_name, oauth1_tokens):
+        """
+        oauth1_tokens: instance of OAuth1Tokens (from your service).
+        """
+        return self.update_or_create(
+            user=user,
+            service_name=service_name,
+            defaults={
+                "oauth_token": oauth1_tokens.oauth_token,
+                "oauth_token_secret": oauth1_tokens.oauth_token_secret,
+            },
+        )
+
+
+class OAuth1Token(BaseModel):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="oauth1_tokens",
+    )
+    service_name = models.CharField(max_length=50, choices=ServiceChoices.choices)
+    oauth_token = EncryptedField(max_length=500)
+    oauth_token_secret = EncryptedField(max_length=500)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = OAuth1TokenManager
+
+    class Meta:
+        unique_together = ("user", "service_name")
+
+    def __str__(self):
+        return f"{self.user} - {self.service_name} OAuth1 Token"
