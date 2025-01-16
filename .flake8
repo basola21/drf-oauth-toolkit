@@ -5,6 +5,7 @@ exclude =
     **/migrations/*,
     __pycache__,
     tests/,
+    docs/
     build,
     dist,
     .tox,
