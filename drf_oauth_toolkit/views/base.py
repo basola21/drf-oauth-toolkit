@@ -3,10 +3,12 @@ from typing import Dict
 
 from django.contrib.auth import get_user_model
 from rest_framework import serializers, status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
 from drf_oauth_toolkit.exceptions import CSRFValidationError, OAuthException, TokenValidationError
+from drf_oauth_toolkit.models import OAuthRequestToken
 from drf_oauth_toolkit.services.base import OAuth1ServiceBase, OAuth2ServiceBase
 from drf_oauth_toolkit.utils.commons import PublicApi
 
@@ -188,24 +190,15 @@ class OAuth2CallbackApiBase(PublicApi):
 
 
 class OAuth1RedirectApiBase(PublicApi):
-    """
-    Base class that handles:
-      1) Obtain request token via the service
-      2) Store the token in session (or DB)
-      3) Return the authorization URL for the provider
-    """
-
     oauth_service_class = OAuth1ServiceBase
-
     session_token_key = "oauth1_temp_token"
 
     def store_request_token(self, request, token_data: Dict[str, str]) -> None:
-        """
-        Default: store token_data in the session.
-        If you prefer a DB approach, override this method.
-        """
-        request.session[self.session_token_key] = token_data
-        request.session.modified = True
+        OAuthRequestToken.objects.store_token(
+            user=request.user if request.user.is_authenticated else None,
+            request_token=token_data["oauth_token"],
+            request_token_secret=token_data["oauth_token_secret"],
+        )
 
     def build_authorization_url(self, oauth_token: str) -> str:
         """
@@ -217,24 +210,85 @@ class OAuth1RedirectApiBase(PublicApi):
         return f"{service.AUTHORIZATION_URL}?oauth_token={oauth_token}"
 
     def get(self, request, *args, **kwargs):
+        service = self.oauth_service_class()
+        token_data = service.get_request_token(request)
+
+        self.store_request_token(request, token_data)
+
+        oauth_token = token_data["oauth_token"]
+        authorization_url = self.build_authorization_url(oauth_token)
+
+        return Response({"authorization_url": authorization_url}, status=status.HTTP_200_OK)
+
+
+class OAuth1CallbackApiBase(PublicApi):
+    oauth_service_class = OAuth1ServiceBase
+    session_token_key = "oauth1_temp_token"
+
+    class InputSerializer(serializers.Serializer):
+        oauth_token = serializers.CharField(required=False)
+        oauth_verifier = serializers.CharField(required=False)
+        error = serializers.CharField(required=False)
+
+    def retrieve_request_token(self, request, incoming_oauth_token: str) -> Dict[str, str]:
+        token = OAuthRequestToken.objects.get(request_token=incoming_oauth_token)
+
+        if token.user and request.user != token.user:
+            raise PermissionDenied("User mismatch or CSRF validation error.")
+
+        return {
+            "oauth_token": token.request_token,
+            "oauth_token_secret": token.request_token_secret,
+        }
+
+    def update_account(self, request, oauth_tokens) -> None:
+        """
+        Hook for subclasses to store or link final tokens with a user account or model.
+        By default, does nothing.
+        """
+        pass
+
+    def generate_success_response(self, oauth_tokens):
+        """
+        Return tokens in the response. Subclasses can override or add more data.
+        """
+        return Response(
+            {
+                "oauth_token": oauth_tokens.oauth_token,
+                "oauth_token_secret": oauth_tokens.oauth_token_secret,
+                "user_id": oauth_tokens.user_id,
+                "screen_name": oauth_tokens.screen_name,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def get(self, request, *args, **kwargs):
+        input_serializer = self.InputSerializer(data=request.GET)
+        input_serializer.is_valid(raise_exception=True)
+        validated_data = input_serializer.validated_data
+
+        error = validated_data.get("error")
+        if error:
+            return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
+
+        oauth_token = validated_data.get("oauth_token")
+        oauth_verifier = validated_data.get("oauth_verifier")
+
+        if not oauth_token or not oauth_verifier:
+            return Response(
+                {"error": "Missing oauth_token or oauth_verifier"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        self.retrieve_request_token(request, oauth_token)
+
         try:
             service = self.oauth_service_class()
-            # Step 1: Get request token
-            token_data = service.get_request_token(request)
-            # token_data should have oauth_token, oauth_token_secret, etc.
-
-            # Step 2: Store token_data (in session by default)
-            self.store_request_token(request, token_data)
-
-            # Step 3: Build the final provider authorization URL
-            oauth_token = token_data["oauth_token"]
-            authorization_url = self.build_authorization_url(oauth_token)
-
-            return Response({"authorization_url": authorization_url}, status=status.HTTP_200_OK)
-
-        except OAuthException as e:
-            logger.exception("OAuth1 request token error")
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            oauth_tokens = service.get_access_token(oauth_token, oauth_verifier)
         except Exception as e:
-            logger.exception("Unexpected error during OAuth1 redirect")
+            logger.exception("Unexpected error during OAuth1 callback")
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        self.update_account(request, oauth_tokens)
+
+        return self.generate_success_response(oauth_tokens)

@@ -4,7 +4,18 @@ from django.conf import settings
 from django.db import models
 from django.utils.timezone import now
 
+from drf_oauth_toolkit.exceptions import NotFoundError
 from drf_oauth_toolkit.utils.fields import EncryptedField
+
+
+class BaseModel(models.Model):
+    class DoesNotExist(NotFoundError):
+        pass
+
+    objects = models.Manager()
+
+    class Meta:
+        abstract = True
 
 
 class OAuth2TokenQuerySet(models.QuerySet):
@@ -40,7 +51,7 @@ class ServiceChoices(models.TextChoices):
     TWITTER = "twitter", "Twitter"
 
 
-class OAuth2Token(models.Model):
+class OAuth2Token(BaseModel):
     """
     A unified token model that can store OAuth2 tokens for multiple services,
     using extendable choices.
@@ -113,14 +124,14 @@ class OAuthRequestTokenManager(models.Manager):
         return self.filter(created_at__lt=threshold).delete()
 
 
-class OAuthRequestToken(models.Model):
+class OAuthRequestToken(BaseModel):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL
     )
     request_token = EncryptedField(max_length=255, unique=True)
     request_token_secret = EncryptedField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
-    objects = OAuthRequestTokenManager
+    objects = OAuthRequestTokenManager()
 
     def __str__(self):
         return f"Token for user={self.user} token={self.request_token}"
@@ -141,7 +152,7 @@ class OAuth1TokenManager(models.Manager):
         )
 
 
-class OAuth1Token(models.Model):
+class OAuth1Token(BaseModel):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,

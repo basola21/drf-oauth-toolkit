@@ -170,7 +170,7 @@ class OAuth1ServiceBase(OAuthBase):
         }
 
     def _generate_oauth_signature(self, method: str, url: str, params: Dict[str, str]) -> str:
-        sorted_params = "&".join(f"{k}={v}" for k, v in sorted(params.items()))
+        sorted_params = "&".join(f"{key}={value}" for key, value in sorted(params.items()))
         base_string = f"{method.upper()}&{quote(url, safe='')}" f"&{quote(sorted_params, safe='')}"
         signing_key = f"{self._credentials.client_secret}&"
         signature = hmac.new(signing_key.encode(), base_string.encode(), hashlib.sha1).digest()
