@@ -5,8 +5,10 @@ build:
   tools:
     python: "3.13"
 
+sphinx:
+  configuration: docs/conf.py
+
 python:
   install:
-    - method: poetry
-sphinx:
-  configuration: docs/source/conf.py
+    - requirements: docs/requirements.txt
+
