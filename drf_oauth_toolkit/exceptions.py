@@ -1,4 +1,13 @@
-from rest_framework.exceptions import APIException
+from rest_framework.exceptions import APIException, NotFound
+
+
+class NotFoundError(NotFound):
+    """
+    Custom NotFound error for API responses.
+    """
+
+    def __init__(self, detail="Object not found.", code=None):
+        super().__init__(detail=detail, code=code)
 
 
 class SettingNotFoundError(Exception):
