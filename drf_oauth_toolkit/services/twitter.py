@@ -30,11 +30,11 @@ class TwitterOAuth2Service(OAuth2ServiceBase):
     Handles PKCE, user info, etc.
     """
 
-    API_URI_NAME = "twitter-oauth2-callback"
+    API_URI_NAME = get_nested_setting(["OAUTH_CREDENTIALS", "twitter", "callback_url"])
     AUTHORIZATION_URL = "https://twitter.com/i/oauth2/authorize"
     TOKEN_URL = "https://api.twitter.com/2/oauth2/token"
     USER_INFO_URL = "https://api.twitter.com/2/users/me"
-    SCOPES = ["tweet.read", "users.read", "offline.access", "tweet.write"]
+    SCOPES = ["tweet.read", "users.read", "offline.access"]
 
     def get_credentials(self) -> OAuth2Credentials:
         """
@@ -62,7 +62,6 @@ class TwitterOAuth2Service(OAuth2ServiceBase):
             .rstrip("=")
         )
 
-        # Store the code_verifier in the session so we can retrieve it later
         self._store_in_session(request, f"{state}_code_verifier", code_verifier)
 
         return {

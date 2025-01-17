@@ -15,6 +15,7 @@ class GoogleOAuthRedirectApi(OAuth2RedirectApiBase):
 class GoogleOAuthCallbackApi(OAuth2CallbackApiBase):
     oauth_service_class = GoogleOAuthService
     session_state_key = "google_oauth_state"
+
     user_info_email_field = "email"
     user_info_first_name_field = "given_name"
     user_info_last_name_field = "family_name"

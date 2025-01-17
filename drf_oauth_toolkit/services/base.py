@@ -79,13 +79,15 @@ class OAuth2ServiceBase(OAuthBase):
             "grant_type": "refresh_token",
         }
 
-    def get_user_info(self, *, oauth_tokens: OAuth1Tokens | OAuth2Tokens) -> Dict[str, Any]:
+    def get_user_info(
+        self, *, oauth_tokens: OAuth1Tokens | OAuth2Tokens, parameters: Dict = {}
+    ) -> Dict[str, Any]:
         if not self.USER_INFO_URL:
             raise OAuthException("USER_INFO_URL is not defined.")
         if not isinstance(oauth_tokens, OAuth2Tokens):
             raise TokenValidationError()
         headers = {"Authorization": f"Bearer {oauth_tokens.access_token}"}
-        response = requests.get(self.USER_INFO_URL, headers=headers)
+        response = requests.get(self.USER_INFO_URL, headers=headers, params=parameters)
         self._validate_response(response)
         return response.json()
 
