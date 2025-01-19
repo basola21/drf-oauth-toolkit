@@ -7,8 +7,8 @@ from rest_framework.test import APIClient, APIRequestFactory
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from drf_oauth_toolkit.models import OAuth2Token, ServiceChoices
-from drf_oauth_toolkit.services.google import GoogleOAuthService
-from drf_oauth_toolkit.views.google_views import GoogleOAuthCallbackApi, GoogleOAuthRedirectApi
+from drf_oauth_toolkit.services.google import GoogleOAuth2Service
+from drf_oauth_toolkit.views.google_views import GoogleOAuth2CallbackApi, GoogleOAuth2RedirectApi
 
 User = get_user_model()
 
@@ -44,7 +44,7 @@ class TestGoogleOAuth2Service:
                 },
             }
         ):
-            yield GoogleOAuthService()
+            yield GoogleOAuth2Service()
 
     def test_get_authorization_params(self, google_service):
         service = google_service
@@ -82,9 +82,9 @@ class TestGoogleOAuth2Service:
 class TestGoogleOAuthRedirectApi:
     @pytest.fixture
     def mock_oauth_service(self):
-        """Patch the GoogleOAuthService for network isolation."""
+        """Patch the GoogleOAuth2Service for network isolation."""
         with patch.object(
-            GoogleOAuthRedirectApi, "oauth_service_class", autospec=True
+            GoogleOAuth2RedirectApi, "oauth_service_class", autospec=True
         ) as mock_class:
             instance = mock_class.return_value
             instance.get_authorization_url.return_value = (
@@ -101,7 +101,7 @@ class TestGoogleOAuthRedirectApi:
         request = api_rf.get("/google-redirect/")
         request.user = user
 
-        view = GoogleOAuthRedirectApi.as_view()
+        view = GoogleOAuth2RedirectApi.as_view()
         response = view(request)
 
         assert response.status_code == 200
@@ -114,7 +114,7 @@ class TestGoogleOAuthRedirectApi:
         request = api_rf.get("/google-redirect/")
         request.user = MagicMock(is_authenticated=False)
 
-        view = GoogleOAuthRedirectApi.as_view()
+        view = GoogleOAuth2RedirectApi.as_view()
         response = view(request)
 
         assert response.status_code == 200
@@ -124,12 +124,12 @@ class TestGoogleOAuthRedirectApi:
 
 
 @pytest.mark.django_db
-class TestGoogleOAuthCallbackApi:
+class TestGoogleOAuth2CallbackApi:
     @pytest.fixture
     def mock_oauth_service(self):
-        """Patch the GoogleOAuthService for the callback view."""
+        """Patch the GoogleOAuth2Service for the callback view."""
         with patch.object(
-            GoogleOAuthCallbackApi, "oauth_service_class", autospec=True
+            GoogleOAuth2CallbackApi, "oauth_service_class", autospec=True
         ) as mock_class:
             instance = mock_class.return_value
             instance.get_tokens.return_value = MagicMock(
@@ -144,8 +144,8 @@ class TestGoogleOAuthCallbackApi:
             instance._retrieve_from_session.return_value = "mocked_state:jwt_token"
             yield instance
 
-    @patch("drf_oauth_toolkit.views.google_views.GoogleOAuthCallbackApi._validate_state_token")
-    @patch("drf_oauth_toolkit.views.google_views.GoogleOAuthCallbackApi._get_user_from_token")
+    @patch("drf_oauth_toolkit.views.google_views.GoogleOAuth2CallbackApi._validate_state_token")
+    @patch("drf_oauth_toolkit.views.google_views.GoogleOAuth2CallbackApi._get_user_from_token")
     def test_callback_success_existing_user(
         self, mock_get_user_from_token, mock_validate_state_token, http_rf, mock_oauth_service
     ):
@@ -161,13 +161,13 @@ class TestGoogleOAuthCallbackApi:
         )
         request.session = {"google_oauth_state": f"mocked_state:{access_token}"}
 
-        view = GoogleOAuthCallbackApi.as_view()
+        view = GoogleOAuth2CallbackApi.as_view()
         response = view(request)
 
         assert response.status_code == 200
         mock_oauth_service.get_user_info.assert_not_called()
 
-    @patch("drf_oauth_toolkit.views.google_views.GoogleOAuthCallbackApi._validate_state_token")
+    @patch("drf_oauth_toolkit.views.google_views.GoogleOAuth2CallbackApi._validate_state_token")
     def test_callback_creates_new_user(
         self,
         mock_validate_state_token,
@@ -181,7 +181,7 @@ class TestGoogleOAuthCallbackApi:
             "/google-callback/", {"code": "mock_code", "state": "mocked_state:unauthenticated"}
         )
         request.session = {"google_oauth_state": "mocked_state:unauthenticated"}
-        view = GoogleOAuthCallbackApi.as_view()
+        view = GoogleOAuth2CallbackApi.as_view()
         response = view(request)
 
         assert response.status_code == 200
@@ -194,7 +194,7 @@ class TestGoogleOAuthCallbackApi:
     def test_callback_provider_error(self, api_rf):
         """If Google returns an error, return a 400."""
         request = api_rf.get("/google-callback/", {"error": "access_denied"})
-        view = GoogleOAuthCallbackApi.as_view()
+        view = GoogleOAuth2CallbackApi.as_view()
         response = view(request)
 
         assert response.status_code == 400
@@ -203,14 +203,14 @@ class TestGoogleOAuthCallbackApi:
     def test_callback_invalid_jwt(self, api_rf, mock_oauth_service):
         """Invalid JWT should return a 401."""
         with patch.object(
-            GoogleOAuthCallbackApi.oauth_service_class,
+            GoogleOAuth2CallbackApi.oauth_service_class,
             "_retrieve_from_session",
             return_value="mocked_state:BAD_JWT_TOKEN",
         ):
             request = api_rf.get(
                 "/google-callback/", {"code": "mock_code", "state": "mocked_state"}
             )
-            response = GoogleOAuthCallbackApi.as_view()(request)
+            response = GoogleOAuth2CallbackApi.as_view()(request)
 
         assert response.status_code == 401
         assert "Could not validate JWT token" in response.data["error"]
@@ -218,14 +218,14 @@ class TestGoogleOAuthCallbackApi:
     def test_callback_unauthenticated_flow_creates_user(self, api_rf, mock_oauth_service):
         """When unauthenticated, a new user should be created."""
         with patch.object(
-            GoogleOAuthCallbackApi.oauth_service_class,
+            GoogleOAuth2CallbackApi.oauth_service_class,
             "_retrieve_from_session",
             return_value="mocked_state:unauthenticated",
         ):
             request = api_rf.get(
                 "/google-callback/", {"code": "mock_code", "state": "mocked_state"}
             )
-            response = GoogleOAuthCallbackApi.as_view()(request)
+            response = GoogleOAuth2CallbackApi.as_view()(request)
 
         assert response.status_code == 200
         assert User.objects.filter(email="newuser@example.com").exists()

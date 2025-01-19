@@ -5,7 +5,7 @@ from drf_oauth_toolkit.utils.settings_loader import get_nested_setting
 from drf_oauth_toolkit.utils.types import OAuth2Credentials
 
 
-class GoogleOAuthService(OAuth2ServiceBase):
+class GoogleOAuth2Service(OAuth2ServiceBase):
     API_URI_NAME = get_nested_setting(["OAUTH_CREDENTIALS", "google", "callback_url"])
     AUTHORIZATION_URL = "https://accounts.google.com/o/oauth2/auth"
     TOKEN_URL = "https://oauth2.googleapis.com/token"

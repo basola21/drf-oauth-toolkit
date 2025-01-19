@@ -125,16 +125,6 @@ class TwitterOAuth1aService(OAuth1ServiceBase):
             raise ImproperlyConfigured("Twitter consumer_key or consumer_secret not set.")
         return OAuth1Credentials(consumer_key=consumer_key, consumer_secret=consumer_secret)
 
-    def get_request_token(self, request) -> Dict[str, str]:
-        """
-        Request a temporary oauth_token and oauth_token_secret from Twitter.
-        You can store them in DB or session as needed.
-        """
-        # The parent class implements the logic for signing, but it expects
-        # self._credentials.client_id / client_secret. We’ll override _get_oauth1_params.
-        # Then call super().get_request_token().
-        return super().get_request_token(request)
-
     def get_access_token(self, oauth_token: str, oauth_verifier: str) -> OAuth1Tokens:
         """
         Exchange the request token + verifier for an access token.
@@ -244,4 +234,4 @@ class TwitterOAuth1aService(OAuth1ServiceBase):
         """
         Typically the same as the parent's approach, but you can override for custom encoding.
         """
-        return ", ".join(f'{k}="{quote(v, safe="")}"' for k, v in params.items())
+        return ", ".join(f'{key}="{quote(value, safe="")}"' for key, value in params.items())

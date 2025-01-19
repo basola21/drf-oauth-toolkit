@@ -56,12 +56,12 @@ OAUTH_CREDENTIALS = {
 2. **Extend the base service class** to integrate a provider:
 
 ```python
-from drf_oauth_toolkit.views.google_views import GoogleOAuthCallbackApi, GoogleOAuthRedirectApi
+from drf_oauth_toolkit.views.google_views import GoogleOAuth2CallbackApi, GoogleOAuth2RedirectApi
 
 urlpatterns = [
     ...
-    path("oauth2/google/login", GoogleOAuthRedirectApi.as_view(), name="google-login"),
-    path("oauth2/google/callback", GoogleOAuthCallbackApi.as_view(), name="google-callback"), # sure the url name matches the one in the settings
+    path("oauth2/google/login", GoogleOAuth2RedirectApi.as_view(), name="google-login"),
+    path("oauth2/google/callback", GoogleOAuth2CallbackApi.as_view(), name="google-callback"), # sure the url name matches the one in the settings
 ]
 ```
 ---
@@ -110,13 +110,13 @@ you can use something like below example:
 from django.contrib.auth import get_user_model
 
 from drf_oauth_toolkit.models import OAuth2Token, ServiceChoices
-from drf_oauth_toolkit.services.google import GoogleOAuthService
+from drf_oauth_toolkit.services.google import GoogleOAuth2Service
 from drf_oauth_toolkit.views.base import OAuthCallbackApiBase
 
 User = get_user_model()
 
-class GoogleOAuthCallbackApi(OAuthCallbackApiBase):
-    oauth_service_class = GoogleOAuthService
+class GoogleOAuth2CallbackApi(OAuthCallbackApiBase):
+    oauth_service_class = GoogleOAuth2Service
     session_state_key = "google_oauth_state"
     user_info_email_field = "email"
     user_info_first_name_field = "given_name"
@@ -161,7 +161,7 @@ class GoogleOAuthCallbackApi(OAuthCallbackApiBase):
 You can easily extend the base service for different OAuth providers. For example, handling **YouTube** OAuth integration:
 
 ```python
-class YouTubeOAuthService(GoogleOAuthService):
+class YouTubeOAuthService(GoogleOAuth2Service):
     API_URI_NAME = "youtube_callback"
     SCOPES = [
         "https://www.googleapis.com/auth/youtube.readonly",
