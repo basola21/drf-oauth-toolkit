@@ -131,4 +131,9 @@ OAUTH_CREDENTIALS = {
         "client_secert": "add yours here",
         "callback_url": "goolge-callback",
     },
+    "twitter": {
+        "client_id": "add your google app id here",
+        "client_secert": "add yours here",
+        "callback_url": "goolge-callback",
+    },
 }
