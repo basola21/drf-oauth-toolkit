@@ -23,14 +23,10 @@ class TwitterOAuth2CallbackApi(OAuth2CallbackApiBase):
         """
         Update or create a user account with the given OAuth tokens.
         """
-        user_info = self.oauth_service_class().get_user_info(oauth_tokens=oauth_tokens)["data"]
 
         if user is None:
+            user_info = self.oauth_service_class().get_user_info(oauth_tokens=oauth_tokens)["data"]
             user = self.create_user_from_oauth(user_info)
-        else:
-            user.name = user_info.get("name", user.name)
-            user.username = user_info.get("username", user.username)
-            user.save()
 
         OAuth2Token.objects.update_or_create_token(
             user=user, service_name=ServiceChoices.TWITTER, oauth_tokens=oauth_tokens

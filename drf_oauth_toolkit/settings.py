@@ -129,11 +129,11 @@ OAUTH_CREDENTIALS = {
     "google": {
         "client_id": "add your google app id here",
         "client_secert": "add yours here",
-        "callback_url": "goolge-callback",
+        "callback_url": "goolge_callback",
     },
     "twitter": {
         "client_id": "add your google app id here",
         "client_secert": "add yours here",
-        "callback_url": "goolge-callback",
+        "callback_url": "twitter_callback",
     },
 }

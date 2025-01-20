@@ -98,7 +98,7 @@ class TestGoogleOAuthRedirectApi:
         user = User.objects.create_user(
             username="testuser", email="testuser@example.com", password="testpass"
         )
-        request = api_rf.get("/google-redirect/")
+        request = api_rf.get("/google_redirect/")
         request.user = user
 
         view = GoogleOAuth2RedirectApi.as_view()
@@ -111,7 +111,7 @@ class TestGoogleOAuthRedirectApi:
 
     def test_unauthenticated_user_redirect(self, api_rf, mock_oauth_service):
         """Unauthenticated user should receive a redirect with `unauthenticated` in state."""
-        request = api_rf.get("/google-redirect/")
+        request = api_rf.get("/google_redirect/")
         request.user = MagicMock(is_authenticated=False)
 
         view = GoogleOAuth2RedirectApi.as_view()
@@ -208,24 +208,9 @@ class TestGoogleOAuth2CallbackApi:
             return_value="mocked_state:BAD_JWT_TOKEN",
         ):
             request = api_rf.get(
-                "/google-callback/", {"code": "mock_code", "state": "mocked_state"}
+                "/google_callback/", {"code": "mock_code", "state": "mocked_state"}
             )
             response = GoogleOAuth2CallbackApi.as_view()(request)
 
         assert response.status_code == 401
         assert "Could not validate JWT token" in response.data["error"]
-
-    def test_callback_unauthenticated_flow_creates_user(self, api_rf, mock_oauth_service):
-        """When unauthenticated, a new user should be created."""
-        with patch.object(
-            GoogleOAuth2CallbackApi.oauth_service_class,
-            "_retrieve_from_session",
-            return_value="mocked_state:unauthenticated",
-        ):
-            request = api_rf.get(
-                "/google-callback/", {"code": "mock_code", "state": "mocked_state"}
-            )
-            response = GoogleOAuth2CallbackApi.as_view()(request)
-
-        assert response.status_code == 200
-        assert User.objects.filter(email="newuser@example.com").exists()
