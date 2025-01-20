@@ -7,12 +7,12 @@ from drf_oauth_toolkit.views.base import OAuth2CallbackApiBase, OAuth2RedirectAp
 User = get_user_model()
 
 
-class TwitterOAuthRedirectApi(OAuth2RedirectApiBase):
+class TwitterOAuth2RedirectApi(OAuth2RedirectApiBase):
     oauth_service_class = TwitterOAuth2Service
     session_state_key = 'twitter_oauth2_state'
 
 
-class TwitterOAuthCallbackApi(OAuth2CallbackApiBase):
+class TwitterOAuth2CallbackApi(OAuth2CallbackApiBase):
     oauth_service_class = TwitterOAuth2Service
     session_state_key = "twitter_oauth2_state"
 
