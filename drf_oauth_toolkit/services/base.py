@@ -11,7 +11,7 @@ import requests
 from oauthlib.common import UNICODE_ASCII_CHARACTER_SET
 
 from drf_oauth_toolkit.exceptions import OAuthException, TokenValidationError
-from drf_oauth_toolkit.utils.types import OAuth1Tokens, OAuth2Tokens, OAuthBase
+from drf_oauth_toolkit.utils.types import OAuth1Credentials, OAuth1Tokens, OAuth2Tokens, OAuthBase
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +113,7 @@ class OAuth2ServiceBase(OAuthBase):
 class OAuth1ServiceBase(OAuthBase):
     REQUEST_TOKEN_URL: str
     ACCESS_TOKEN_URL: str
+    AUTHORIZATION_URL: str
 
     def __init__(self):
         self._credentials = self.get_credentials()
@@ -125,45 +126,33 @@ class OAuth1ServiceBase(OAuthBase):
             params=oauth_params,
         )
         headers = {"Authorization": f"OAuth {self._format_oauth_header(oauth_params)}"}
-
         response = requests.post(self.REQUEST_TOKEN_URL, headers=headers)
         if not response.ok:
             raise OAuthException(f"Failed to obtain request token: {response.text}")
 
-        return dict(parse_qsl(response.text))
-
-    def get_access_token(self, oauth_token: str, oauth_verifier: str) -> OAuth1Tokens:
-        oauth_params = self._get_oauth1_params()
-        oauth_params.update(
-            {
-                "oauth_token": oauth_token,
-                "oauth_verifier": oauth_verifier,
-            }
-        )
-        oauth_params["oauth_signature"] = self._generate_oauth_signature(
-            method="POST",
-            url=self.ACCESS_TOKEN_URL,
-            params=oauth_params,
-        )
-        headers = {"Authorization": f"OAuth {self._format_oauth_header(oauth_params)}"}
-        response = requests.post(self.ACCESS_TOKEN_URL, headers=headers)
-
-        if not response.ok:
-            raise OAuthException(f"Failed to obtain access token: {response.text}")
-
-        # Parse the response; typically you’ll get oauth_token and oauth_token_secret
         token_data = dict(parse_qsl(response.text))
+        self._save_request_token(request, token_data)
+        return token_data
 
-        return OAuth1Tokens(
-            oauth_token=token_data["oauth_token"],
-            oauth_token_secret=token_data["oauth_token_secret"],
-            user_id=token_data.get("user_id"),
-            screen_name=token_data.get("screen_name"),
-        )
+    def _generate_oauth_signature(
+        self, method: str, url: str, params: Dict[str, str], token_secret: str = ""
+    ) -> str:
+        assert isinstance(
+            self._credentials, OAuth1Credentials
+        ), "Credentials must be of type OAuth1Credentials"
+        sorted_params = "&".join(f"{quote(k)}={quote(v)}" for k, v in sorted(params.items()))
+        base_string = f"{method.upper()}&{quote(url)}&{quote(sorted_params)}"
+        signing_key = f"{self._credentials.consumer_secret}&{token_secret}"
+        signature = hmac.new(signing_key.encode(), base_string.encode(), hashlib.sha1).digest()
+        return base64.b64encode(signature).decode()
 
     def _get_oauth1_params(self, callback_url: str = "") -> Dict[str, str]:
+        assert isinstance(
+            self._credentials, OAuth1Credentials
+        ), "Credentials must be of type OAuth1Credentials"
+
         return {
-            "oauth_consumer_key": self._credentials.client_id,
+            "oauth_consumer_key": self._credentials.consumer_key,
             "oauth_nonce": base64.b64encode(SystemRandom().randbytes(16)).decode(),
             "oauth_signature_method": "HMAC-SHA1",
             "oauth_timestamp": str(int(time.time())),
@@ -171,12 +160,19 @@ class OAuth1ServiceBase(OAuthBase):
             "oauth_callback": callback_url,
         }
 
-    def _generate_oauth_signature(self, method: str, url: str, params: Dict[str, str]) -> str:
-        sorted_params = "&".join(f"{key}={value}" for key, value in sorted(params.items()))
-        base_string = f"{method.upper()}&{quote(url, safe='')}" f"&{quote(sorted_params, safe='')}"
-        signing_key = f"{self._credentials.client_secret}&"
-        signature = hmac.new(signing_key.encode(), base_string.encode(), hashlib.sha1).digest()
-        return base64.b64encode(signature).decode()
-
     def _format_oauth_header(self, params: Dict[str, str]) -> str:
-        return ", ".join(f'{key}="{value}"' for key, value in params.items())
+        return ", ".join(f'{k}="{quote(v, safe="")}"' for k, v in params.items())
+
+    def _generate_nonce(self) -> str:
+        """
+        Generate a random nonce for OAuth1 requests.
+        """
+        # Generate 16 random bytes (128 bits) and encode them in base64
+        return base64.b64encode(SystemRandom().randbytes(16)).decode()
+
+    def _save_request_token(self, request, token_data: Dict[str, str]):
+        """Optional hook for subclasses to save tokens (e.g., to a database)."""
+        pass
+
+    def get_user(self, request):
+        raise NotImplementedError("Subclasses must implement this method.")
