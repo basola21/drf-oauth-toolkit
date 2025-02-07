@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any
 
 from drf_oauth_toolkit.services.base import OAuth2ServiceBase
 from drf_oauth_toolkit.utils.settings_loader import get_nested_setting
@@ -18,10 +18,14 @@ class GoogleOAuth2Service(OAuth2ServiceBase):
     def get_credentials(self) -> OAuth2Credentials:
         return OAuth2Credentials(
             client_id=get_nested_setting(["OAUTH_CREDENTIALS", "google", "client_id"]),
-            client_secret=get_nested_setting(["OAUTH_CREDENTIALS", "google", "client_secret"]),
+            client_secret=get_nested_setting(
+                ["OAUTH_CREDENTIALS", "google", "client_secret"]
+            ),
         )
 
-    def get_authorization_params(self, redirect_uri: str, state: str, request) -> Dict[str, Any]:
+    def get_authorization_params(
+        self, redirect_uri: str, state: str, request
+    ) -> dict[str, Any]:
         return {
             "client_id": self._credentials.client_id,
             "redirect_uri": redirect_uri,
@@ -34,7 +38,7 @@ class GoogleOAuth2Service(OAuth2ServiceBase):
 
     def get_token_request_data(
         self, code: str, redirect_uri: str, state: str, request
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         return {
             "code": code,
             "client_id": self._credentials.client_id,

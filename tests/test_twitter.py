@@ -1,17 +1,19 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.test import RequestFactory, override_settings
-from rest_framework.test import APIClient, APIRequestFactory
+from django.test import RequestFactory
+from django.test import override_settings
+from rest_framework.test import APIClient
+from rest_framework.test import APIRequestFactory
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from drf_oauth_toolkit.models import OAuth2Token, ServiceChoices
+from drf_oauth_toolkit.models import OAuth2Token
+from drf_oauth_toolkit.models import ServiceChoices
 from drf_oauth_toolkit.services.twitter import TwitterOAuth2Service
-from drf_oauth_toolkit.views.twitter_views import (
-    TwitterOAuth2CallbackApi,
-    TwitterOAuth2RedirectApi,
-)
+from drf_oauth_toolkit.views.twitter_views import TwitterOAuth2CallbackApi
+from drf_oauth_toolkit.views.twitter_views import TwitterOAuth2RedirectApi
 
 User = get_user_model()
 
@@ -49,7 +51,7 @@ class TestTwitterOAuth2Service:
         ):
             yield TwitterOAuth2Service()
 
-    @patch("drf_oauth_toolkit.services.base.OAuth2ServiceBase._store_in_session")
+    @patch("drf_oauth_toolkit.services.base.OAuth2ServiceBase.store_in_session")
     def test_get_authorization_params(self, mock_store_in_session, twitter_service):
         mock_store_in_session.return_value = None
         service = twitter_service
@@ -61,13 +63,15 @@ class TestTwitterOAuth2Service:
         assert " ".join(service.SCOPES) in params["scope"]
         assert params["state"] == state
 
-    @patch("drf_oauth_toolkit.services.base.OAuth2ServiceBase._retrieve_from_session")
+    @patch("drf_oauth_toolkit.services.base.OAuth2ServiceBase.retrieve_from_session")
     def test_get_token_request_data(self, mock_retrive_from_session, twitter_service):
         mock_retrive_from_session.return_value = "some_state"
         service = twitter_service
         code = "sample_code"
         redirect_uri = "https://example.com/callback"
-        data = service.get_token_request_data(code, redirect_uri, state="some_state", request=None)
+        data = service.get_token_request_data(
+            code, redirect_uri, state="some_state", request=None
+        )
         assert data["code"] == code
         assert data["client_id"] == service.get_credentials().client_id
         assert data["redirect_uri"] == redirect_uri
@@ -111,8 +115,11 @@ class TestGoogleOAuthRedirectApi:
 
         assert response.status_code == 200
         assert "authorization_url" in response.data
-        assert response.data["authorization_url"] == "https://accounts.twitter.com/o/oauth2/auth"
-        mock_oauth_service._store_in_session.assert_called_once()
+        assert (
+            response.data["authorization_url"]
+            == "https://accounts.twitter.com/o/oauth2/auth"
+        )
+        mock_oauth_service.store_in_session.assert_called_once()
 
     # TODO: make sure this test checks the state correctly
     def test_unauthenticated_user_redirect(self, api_rf, mock_oauth_service):
@@ -125,8 +132,11 @@ class TestGoogleOAuthRedirectApi:
 
         assert response.status_code == 200
         assert "authorization_url" in response.data
-        assert response.data["authorization_url"] == "https://accounts.twitter.com/o/oauth2/auth"
-        mock_oauth_service._store_in_session.assert_called_once()
+        assert (
+            response.data["authorization_url"]
+            == "https://accounts.twitter.com/o/oauth2/auth"
+        )
+        mock_oauth_service.store_in_session.assert_called_once()
 
 
 @pytest.mark.django_db
@@ -139,7 +149,9 @@ class TestTwitterOAuth2CallbackApi:
         ) as mock_class:
             instance = mock_class.return_value
             instance.get_tokens.return_value = MagicMock(
-                access_token="mock_access_token", refresh_token="mock_refresh_token", expires_in=90
+                access_token="mock_access_token",
+                refresh_token="mock_refresh_token",
+                expires_in=90,
             )
             instance.get_user_info.return_value = {
                 "data": {
@@ -149,23 +161,34 @@ class TestTwitterOAuth2CallbackApi:
                 }
             }
 
-            instance._retrieve_from_session.return_value = "mocked_state:jwt_token"
+            instance.retrieve_from_session.return_value = "mocked_state:jwt_token"
             yield instance
 
-    @patch("drf_oauth_toolkit.views.twitter_views.TwitterOAuth2CallbackApi._validate_state_token")
-    @patch("drf_oauth_toolkit.views.twitter_views.TwitterOAuth2CallbackApi._get_user_from_token")
+    @patch(
+        "drf_oauth_toolkit.views.twitter_views.TwitterOAuth2CallbackApi._validate_state_token"
+    )
+    @patch(
+        "drf_oauth_toolkit.views.twitter_views.TwitterOAuth2CallbackApi._get_user_from_token"
+    )
     def test_callback_success_existing_user(
-        self, mock_get_user_from_token, mock_validate_state_token, http_rf, mock_oauth_service
+        self,
+        mock_get_user_from_token,
+        mock_validate_state_token,
+        http_rf,
+        mock_oauth_service,
     ):
         """If the user exists, their tokens should be updated."""
-        user = User.objects.create_user(username="testuser", email="testuser@example.com")
+        user = User.objects.create_user(
+            username="testuser", email="testuser@example.com"
+        )
         access_token = str(RefreshToken.for_user(user).access_token)
 
         mock_validate_state_token.return_value = access_token
         mock_get_user_from_token.return_value = user
 
         request = http_rf.get(
-            "/twitter-callback/", {"code": "mock_code", "state": f"mocked_state:{access_token}"}
+            "/twitter-callback/",
+            {"code": "mock_code", "state": f"mocked_state:{access_token}"},
         )
         request.session = {"twitter_oauth_state": f"mocked_state:{access_token}"}
 
@@ -175,7 +198,9 @@ class TestTwitterOAuth2CallbackApi:
         assert response.status_code == 200
         mock_oauth_service.get_user_info.assert_not_called()
 
-    @patch("drf_oauth_toolkit.views.twitter_views.TwitterOAuth2CallbackApi._validate_state_token")
+    @patch(
+        "drf_oauth_toolkit.views.twitter_views.TwitterOAuth2CallbackApi._validate_state_token"
+    )
     def test_callback_creates_new_user(
         self,
         mock_validate_state_token,
@@ -186,7 +211,8 @@ class TestTwitterOAuth2CallbackApi:
 
         mock_validate_state_token.return_value = "unauthenticated"
         request = api_rf.get(
-            "/google-callback/", {"code": "mock_code", "state": "mocked_state:unauthenticated"}
+            "/google-callback/",
+            {"code": "mock_code", "state": "mocked_state:unauthenticated"},
         )
         request.session = {"twitter_oauth_state": "mocked_state:unauthenticated"}
         view = TwitterOAuth2CallbackApi.as_view()
@@ -197,7 +223,9 @@ class TestTwitterOAuth2CallbackApi:
         user = User.objects.get(username="newuser")
         assert user.first_name == "New"
         assert user.last_name == "User"
-        assert OAuth2Token.objects.filter(user=user, service_name=ServiceChoices.TWITTER).exists()
+        assert OAuth2Token.objects.filter(
+            user=user, service_name=ServiceChoices.TWITTER
+        ).exists()
 
     def test_callback_provider_error(self, api_rf):
         """If Google returns an error, return a 400."""
@@ -212,7 +240,7 @@ class TestTwitterOAuth2CallbackApi:
         """Invalid JWT should return a 401."""
         with patch.object(
             TwitterOAuth2CallbackApi.oauth_service_class,
-            "_retrieve_from_session",
+            "retrieve_from_session",
             return_value="mocked_state:BAD_JWT_TOKEN",
         ):
             request = api_rf.get(

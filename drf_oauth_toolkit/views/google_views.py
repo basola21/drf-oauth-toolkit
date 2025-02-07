@@ -1,8 +1,10 @@
 from django.contrib.auth import get_user_model
 
-from drf_oauth_toolkit.models import OAuth2Token, ServiceChoices
+from drf_oauth_toolkit.models import OAuth2Token
+from drf_oauth_toolkit.models import ServiceChoices
 from drf_oauth_toolkit.services.google import GoogleOAuth2Service
-from drf_oauth_toolkit.views.base import OAuth2CallbackApiBase, OAuth2RedirectApiBase
+from drf_oauth_toolkit.views.base import OAuth2CallbackApiBase
+from drf_oauth_toolkit.views.base import OAuth2RedirectApiBase
 
 User = get_user_model()
 
@@ -25,7 +27,9 @@ class GoogleOAuth2CallbackApi(OAuth2CallbackApiBase):
         Update or create a user account with the given OAuth tokens.
         """
         if user is None:
-            user_info = self.oauth_service_class().get_user_info(oauth_tokens=oauth_tokens)
+            user_info = self.oauth_service_class().get_user_info(
+                oauth_tokens=oauth_tokens
+            )
 
             user = self.create_user_from_oauth(user_info)
 

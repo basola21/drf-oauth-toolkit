@@ -223,4 +223,3 @@ This project is licensed under the MIT License. See the [`LICENSE`](./LICENSE) f
 ## 📫 Contact
 
 For questions and suggestions, feel free to reach out via [GitHub Issues](https://github.com/basola21/drf-oauth-toolkit/issues).
-

@@ -1,16 +1,17 @@
-from typing import Any, Optional
+from typing import Any
 
 from django.conf import settings
 
 from drf_oauth_toolkit.exceptions import SettingNotFoundError
 
 
-def get_nested_setting(keys: list[str], default: Optional[Any] = None) -> Any:
+def get_nested_setting(keys: list[str], default: Any | None = None) -> Any:
     """
     Retrieve a nested setting value from Django settings.
 
     Args:
-        keys (list[str]): A list of keys representing the nested path in the settings dictionary.
+        keys (list[str]): A list of keys representing the nested path
+        in the settings dictionary.
         default (Any, optional): A fallback value if the key path is not present.
 
     Returns:
@@ -37,9 +38,11 @@ def get_nested_setting(keys: list[str], default: Optional[Any] = None) -> Any:
                 raise SettingNotFoundError(
                     f"Invalid key '{key}' for the current nested structure."
                 )
-    except (KeyError, IndexError, TypeError, ValueError):
+    except (KeyError, IndexError, TypeError, ValueError) as e:
         if default is None:
-            raise SettingNotFoundError(f"Setting path '{' -> '.join(keys)}' not found.")
+            raise SettingNotFoundError(
+                f"Setting path '{' -> '.join(keys)}' not found."
+            ) from e
         return default
 
     return value

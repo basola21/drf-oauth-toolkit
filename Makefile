@@ -6,11 +6,13 @@ install:
 	$(POETRY) install
 	$(POETRY) run pre-commit install
 
-# Run all linters and formatters
+# Run all linters using Ruff
 lint:
-	$(POETRY) run flake8 .
-	$(POETRY) run isort .
-	$(POETRY) run black .
+	$(POETRY) run ruff check .
+
+# Format code using Ruff
+format:
+	$(POETRY) run ruff format .
 
 # Check type hints
 mypy:

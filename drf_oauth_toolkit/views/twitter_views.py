@@ -1,15 +1,17 @@
 from django.contrib.auth import get_user_model
 
-from drf_oauth_toolkit.models import OAuth2Token, ServiceChoices
+from drf_oauth_toolkit.models import OAuth2Token
+from drf_oauth_toolkit.models import ServiceChoices
 from drf_oauth_toolkit.services.twitter import TwitterOAuth2Service
-from drf_oauth_toolkit.views.base import OAuth2CallbackApiBase, OAuth2RedirectApiBase
+from drf_oauth_toolkit.views.base import OAuth2CallbackApiBase
+from drf_oauth_toolkit.views.base import OAuth2RedirectApiBase
 
 User = get_user_model()
 
 
 class TwitterOAuth2RedirectApi(OAuth2RedirectApiBase):
     oauth_service_class = TwitterOAuth2Service
-    session_state_key = 'twitter_oauth2_state'
+    session_state_key = "twitter_oauth2_state"
 
 
 class TwitterOAuth2CallbackApi(OAuth2CallbackApiBase):
@@ -25,7 +27,9 @@ class TwitterOAuth2CallbackApi(OAuth2CallbackApiBase):
         """
 
         if user is None:
-            user_info = self.oauth_service_class().get_user_info(oauth_tokens=oauth_tokens)["data"]
+            user_info = self.oauth_service_class().get_user_info(
+                oauth_tokens=oauth_tokens
+            )["data"]
             user = self.create_user_from_oauth(user_info)
 
         OAuth2Token.objects.update_or_create_token(
@@ -42,10 +46,10 @@ class TwitterOAuth2CallbackApi(OAuth2CallbackApiBase):
         first_name = name[0] if name else ""
         last_name = name[1] if len(name) > 1 else ""
         username = user_info.get("username", None)
-        id = user_info.get("id")
+        user_id = user_info.get("id")
 
         # Fallback email logic since Twitter requires oauth1a for email
-        email = f"{id}@twitter.com"
+        email = f"{user_id}@twitter.com"
 
         user, _ = User.objects.get_or_create(
             username=username,

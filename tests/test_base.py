@@ -1,16 +1,16 @@
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
+from unittest.mock import patch
 
 import pytest
 from django.http import HttpRequest
 
 from drf_oauth_toolkit.exceptions import OAuthException
-from drf_oauth_toolkit.services.base import OAuth1ServiceBase, OAuth2ServiceBase
-from drf_oauth_toolkit.utils.types import (
-    OAuth1Credentials,
-    OAuth1Tokens,
-    OAuth2Credentials,
-    OAuth2Tokens,
-)
+from drf_oauth_toolkit.services.base import OAuth1ServiceBase
+from drf_oauth_toolkit.services.base import OAuth2ServiceBase
+from drf_oauth_toolkit.utils.types import OAuth1Credentials
+from drf_oauth_toolkit.utils.types import OAuth1Tokens
+from drf_oauth_toolkit.utils.types import OAuth2Credentials
+from drf_oauth_toolkit.utils.types import OAuth2Tokens
 
 
 class TestOAuth2ServiceBase:
@@ -64,7 +64,9 @@ class TestOAuth2ServiceBase:
             },
         )
         request = HttpRequest()
-        tokens = oauth_service.get_tokens(code="test_code", state="test_state", request=request)
+        tokens = oauth_service.get_tokens(
+            code="test_code", state="test_state", request=request
+        )
         assert tokens.access_token == "test_access_token"
         assert tokens.refresh_token == "test_refresh_token"
         assert tokens.id_token == "test_id_token"
@@ -78,19 +80,27 @@ class TestOAuth2ServiceBase:
         mock_post.return_value = Mock(ok=False, text="Error occurred")
         request = HttpRequest()
         with pytest.raises(OAuthException):
-            oauth_service.get_tokens(code="invalid_code", state="test_state", request=request)
+            oauth_service.get_tokens(
+                code="invalid_code", state="test_state", request=request
+            )
 
     @patch("requests.post")
     def test_refresh_access_token_success(self, mock_post, oauth_service):
-        mock_post.return_value = Mock(ok=True, json=lambda: {"access_token": "new_access_token"})
-        tokens = OAuth2Tokens(access_token="expired", refresh_token="valid_refresh_token")
+        mock_post.return_value = Mock(
+            ok=True, json=lambda: {"access_token": "new_access_token"}
+        )
+        tokens = OAuth2Tokens(
+            access_token="expired", refresh_token="valid_refresh_token"
+        )
         oauth_service._refresh_access_token(tokens)
         assert tokens.access_token == "new_access_token"
 
     @patch("requests.post")
     def test_refresh_access_token_failure(self, mock_post, oauth_service):
         mock_post.return_value = Mock(ok=False, text="Error occurred")
-        tokens = OAuth2Tokens(access_token="expired", refresh_token="valid_refresh_token")
+        tokens = OAuth2Tokens(
+            access_token="expired", refresh_token="valid_refresh_token"
+        )
         with pytest.raises(OAuthException):
             oauth_service._refresh_access_token(tokens)
 
@@ -109,7 +119,8 @@ class TestOAuth1ServiceBase:
 
             def get_credentials(self):
                 credentials = OAuth1Credentials(
-                    consumer_key="test_consumer_key", consumer_secret="test_consumer_secret"
+                    consumer_key="test_consumer_key",
+                    consumer_secret="test_consumer_secret",
                 )
                 return credentials
 

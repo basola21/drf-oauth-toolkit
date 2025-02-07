@@ -9,7 +9,7 @@ from drf_oauth_toolkit.utils.fields import EncryptedField
 
 
 class BaseModel(models.Model):
-    class DoesNotExist(NotFoundError):
+    class DoesNotExistError(NotFoundError):
         pass
 
     objects = models.Manager()
@@ -74,6 +74,9 @@ class OAuth2Token(BaseModel):
     class Meta:
         unique_together = ("user", "service_name")
 
+    def __str__(self):
+        return f"{self.user} - {self.service_name} Token"
+
     def save(self, *args, **kwargs):
         """
         Automatically set token expiration if we have a refresh_token.
@@ -85,9 +88,6 @@ class OAuth2Token(BaseModel):
     def is_token_valid(self) -> bool:
         """Check if the token is still valid."""
         return now() < self.token_expires_at
-
-    def __str__(self):
-        return f"{self.user} - {self.service_name} Token"
 
 
 class OAuthRequestTokenManager(models.Manager):
