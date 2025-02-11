@@ -5,11 +5,6 @@ POETRY = poetry
 install:
 	$(POETRY) install
 	$(POETRY) run pre-commit install
-
-# Run all linters using Ruff
-lint:
-	$(POETRY) run ruff check .
-
 # Format code using Ruff
 format:
 	$(POETRY) run ruff format .
@@ -17,6 +12,10 @@ format:
 # Check type hints
 mypy:
 	$(POETRY) run mypy .
+
+# Run all linters using Ruff
+lint:
+	$(POETRY) run ruff check .
 
 # Run all tests
 .PHONY: test
@@ -41,3 +40,7 @@ check: lint mypy pre-commit test
 # Update pre-commit hooks
 update-hooks:
 	$(POETRY) run pre-commit autoupdate
+
+# run tox in verbose mode
+tox:
+	$(POETRY) run tox -vv

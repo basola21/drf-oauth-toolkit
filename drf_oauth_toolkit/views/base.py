@@ -127,6 +127,9 @@ class OAuth2CallbackApiBase(PublicApi):
 
         state, code = validated_data.get("state"), validated_data.get("code")
 
+        if not code:
+            raise OAuthException
+
         try:
             jwt_token = self._validate_state_token(request, state)
             user = self._get_user_from_token(jwt_token)

@@ -1,4 +1,5 @@
 from datetime import timedelta
+from typing import ClassVar
 
 from django.conf import settings
 from django.db import models
@@ -12,7 +13,7 @@ class BaseModel(models.Model):
     class DoesNotExistError(NotFoundError):
         pass
 
-    objects = models.Manager()
+    objects: ClassVar[models.Manager] = models.Manager()
 
     class Meta:
         abstract = True
@@ -69,7 +70,7 @@ class OAuth2Token(BaseModel):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    objects = OAuth2TokenManager()
+    objects: ClassVar[OAuth2TokenManager] = OAuth2TokenManager()
 
     class Meta:
         unique_together = ("user", "service_name")
@@ -87,6 +88,8 @@ class OAuth2Token(BaseModel):
 
     def is_token_valid(self) -> bool:
         """Check if the token is still valid."""
+        if self.token_expires_at is None:
+            return False
         return now() < self.token_expires_at
 
 
@@ -131,7 +134,8 @@ class OAuthRequestToken(BaseModel):
     request_token = EncryptedField(max_length=255, unique=True)
     request_token_secret = EncryptedField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
-    objects = OAuthRequestTokenManager()
+
+    objects: ClassVar[OAuthRequestTokenManager] = OAuthRequestTokenManager()
 
     def __str__(self):
         return f"Token for user={self.user} token={self.request_token}"
@@ -163,7 +167,7 @@ class OAuth1Token(BaseModel):
     oauth_token_secret = EncryptedField(max_length=500)
     created_at = models.DateTimeField(auto_now_add=True)
 
-    objects = OAuth1TokenManager
+    objects: ClassVar[OAuth1TokenManager] = OAuth1TokenManager()
 
     class Meta:
         unique_together = ("user", "service_name")

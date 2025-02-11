@@ -58,10 +58,10 @@ class OAuthBase:
     ) -> dict[str, Any]:
         raise NotImplementedError("Subclasses must implement this method.")
 
-    def get_credentials(self) -> OAuth1Credentials | OAuth2Credentials:
+    def get_credentials(self):
         raise NotImplementedError("Subclasses must implement this method.")
 
-    def get_tokens(self, *, code: str, state, request) -> OAuth1Tokens | OAuth2Tokens:
+    def get_tokens(self, *, code: str, state, request):
         raise NotImplementedError
 
     def get_user_info(

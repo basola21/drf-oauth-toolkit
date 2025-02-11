@@ -11,9 +11,11 @@ from urllib.parse import urlencode
 
 import requests
 from oauthlib.common import UNICODE_ASCII_CHARACTER_SET
+from oauthlib.common import generate_token
 
 from drf_oauth_toolkit.exceptions import OAuthException
 from drf_oauth_toolkit.exceptions import TokenValidationError
+from drf_oauth_toolkit.models import OAuth1Token
 from drf_oauth_toolkit.utils.types import OAuth1Credentials
 from drf_oauth_toolkit.utils.types import OAuth1Tokens
 from drf_oauth_toolkit.utils.types import OAuth2Tokens
@@ -144,6 +146,39 @@ class OAuth1ServiceBase(OAuthBase):
         token_data = dict(parse_qsl(response.text))
         self._save_request_token(request, token_data)
         return token_data
+
+    def get_access_token(self, oauth_token: str, oauth_verifier: str) -> OAuth1Tokens:
+        """
+        Retrieve the stored token secret from DB, then request an access token.
+        """
+        try:
+            token_obj = OAuth1Token.objects.get(request_token=oauth_token)
+        except OAuth1Token.DoesNotExist as e:
+            raise OAuthException("Invalid or expired request token.") from e
+
+        token_secret = token_obj.request_token_secret
+
+        oauth_params = {
+            "oauth_consumer_key": self._credentials["client_key"],
+            "oauth_token": oauth_token,
+            "oauth_verifier": oauth_verifier,
+            "oauth_nonce": generate_token(length=32),
+            "oauth_signature_method": "HMAC-SHA1",
+            "oauth_timestamp": str(int(time.time())),
+            "oauth_version": "1.0",
+        }
+        oauth_params["oauth_signature"] = self._generate_oauth_signature(
+            method="POST",
+            url=self.ACCESS_TOKEN_URL,
+            params=oauth_params,
+            token_secret=token_secret,
+        )
+        headers = {"Authorization": f"OAuth {self._format_oauth_header(oauth_params)}"}
+        response = requests.post(self.ACCESS_TOKEN_URL, headers=headers)
+        if not response.ok:
+            raise OAuthException(f"Failed to obtain access token: {response.text}")
+
+        return OAuth1Tokens(**dict(parse_qsl(response.text)))
 
     def _generate_oauth_signature(
         self, method: str, url: str, params: dict[str, str], token_secret: str = ""

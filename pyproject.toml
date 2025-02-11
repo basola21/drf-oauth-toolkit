@@ -45,6 +45,14 @@ force-single-line = true
 [tool.mypy]
 python_version = "3.10"
 ignore_missing_imports = true
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+plugins = [
+    "mypy_django_plugin.main",
+    "mypy_drf_plugin.main",
+]
 exclude = [
     "migrations",
     "tests",
@@ -56,6 +64,9 @@ exclude = [
     "build",
     "dist"
 ]
+
+[tool.django-stubs]
+django_settings_module = "drf_oauth_toolkit.settings"
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "drf_oauth_toolkit.settings"
@@ -96,6 +107,8 @@ sphinx = "^8.1.3"
 sphinx-autobuild = "^2024.10.3"
 sphinx-rtd-theme = "^3.0.2"
 ruff = "^0.9.5"
+django-stubs = {extras = ["compatible-mypy"], version = "^5.1.3"}
+djangorestframework-stubs = "^3.15.2"
 
 [build-system]
 requires = ["poetry-core"]

@@ -6,7 +6,6 @@ from typing import Any
 from urllib.parse import parse_qsl
 
 import requests
-from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.crypto import get_random_string
 
@@ -121,8 +120,10 @@ class TwitterOAuth1aService(OAuth1ServiceBase):
     API_URI_NAME = "twitter-oauth1a-callback"
 
     def get_credentials(self) -> OAuth1Credentials:
-        consumer_key = settings.TWITTER_API_KEY
-        consumer_secret = settings.TWITTER_API_SECRET
+        consumer_key = get_nested_setting(["OAUTH_CREDENTIALS", "twitter", "api_key"])
+        consumer_secret = get_nested_setting(
+            ["OAUTH_CREDENTIALS", "twitter", "api_secert"]
+        )
         if not consumer_key or not consumer_secret:
             raise ImproperlyConfigured("Twitter API key/secret not configured.")
         return OAuth1Credentials(
