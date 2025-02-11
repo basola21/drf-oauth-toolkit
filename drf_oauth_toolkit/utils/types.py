@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 import jwt
 from django.urls import reverse_lazy
@@ -23,22 +23,21 @@ class OAuth2Credentials:
 class OAuth1Tokens:
     oauth_token: str
     oauth_token_secret: str
-    user_id: Optional[str] = None
-    screen_name: Optional[str] = None
+    user_id: str | None = None
+    screen_name: str | None = None
 
 
 @dataclass
 class OAuth2Tokens:
     access_token: str
-    refresh_token: Optional[str] = None
-    id_token: Optional[str] = None
-    expires_in: Optional[int] = 90
+    refresh_token: str | None = None
+    id_token: str | None = None
+    expires_in: int | None = 90
 
-    def decode_id_token(self) -> Dict[str, Any]:
+    def decode_id_token(self) -> dict[str, Any]:
         if not self.id_token:
             return {}
-        decoded_token = jwt.decode(jwt=self.id_token, options={"verify_signature": False})
-        return decoded_token
+        return jwt.decode(jwt=self.id_token, options={"verify_signature": False})
 
 
 class OAuthBase:
@@ -54,14 +53,18 @@ class OAuthBase:
         domain = get_nested_setting(["OAUTH_CREDENTIALS", "host"])
         return f"{domain}{reverse_lazy(self.API_URI_NAME)}"
 
-    def get_authorization_params(self, redirect_uri: str, state: str, request) -> Dict[str, Any]:
+    def get_authorization_params(
+        self, redirect_uri: str, state: str, request
+    ) -> dict[str, Any]:
         raise NotImplementedError("Subclasses must implement this method.")
 
-    def get_credentials(self) -> OAuth1Credentials | OAuth2Credentials:
+    def get_credentials(self):
         raise NotImplementedError("Subclasses must implement this method.")
 
-    def get_tokens(self, *, code: str, state, request) -> OAuth1Tokens | OAuth2Tokens:
+    def get_tokens(self, *, code: str, state, request):
         raise NotImplementedError
 
-    def get_user_info(self, *, oauth_tokens: OAuth1Tokens | OAuth2Tokens) -> Dict[str, Any]:
+    def get_user_info(
+        self, *, oauth_tokens: OAuth1Tokens | OAuth2Tokens
+    ) -> dict[str, Any]:
         raise NotImplementedError

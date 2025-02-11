@@ -1,12 +1,15 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
 from django.contrib.auth import get_user_model
-from rest_framework.test import APIClient, APIRequestFactory
+from rest_framework.test import APIClient
+from rest_framework.test import APIRequestFactory
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from drf_oauth_toolkit.utils.types import OAuth2Tokens
-from drf_oauth_toolkit.views.base import OAuth2CallbackApiBase, OAuth2RedirectApiBase
+from drf_oauth_toolkit.views.base import OAuth2CallbackApiBase
+from drf_oauth_toolkit.views.base import OAuth2RedirectApiBase
 
 User = get_user_model()
 
@@ -35,7 +38,7 @@ class TestOAuthRedirectApiBase:
         Patch the oauth_service_class so we don't do real network calls.
         """
         with patch.object(
-            OAuth2RedirectApiBase, 'oauth_service_class', autospec=True
+            OAuth2RedirectApiBase, "oauth_service_class", autospec=True
         ) as mock_class:
             instance = mock_class.return_value
             instance.get_authorization_url.return_value = (
@@ -70,12 +73,12 @@ class TestOAuthRedirectApiBase:
         assert data["authorization_url"] == "https://provider.com/oauth/authorize"
 
         # Check that state was stored in session (the base class uses
-        # _store_in_session, but to test thoroughly you might need
+        # store_in_session, but to test thoroughly you might need
         # to mock session or see if the call was made).
-        mock_oauth_service._store_in_session.assert_called_once()
+        mock_oauth_service.store_in_session.assert_called_once()
 
-        # Extract the state we passed to _store_in_session
-        args, kwargs = mock_oauth_service._store_in_session.call_args
+        # Extract the state we passed to store_in_session
+        args, kwargs = mock_oauth_service.store_in_session.call_args
         request_arg, key_arg, combined_state_arg = args
         assert key_arg == "test_redirect_state"
         assert ":" in combined_state_arg  # e.g. "mocked_state:<JWT>"
@@ -100,8 +103,8 @@ class TestOAuthRedirectApiBase:
         assert data["authorization_url"] == "https://provider.com/oauth/authorize"
 
         # Check state storage
-        mock_oauth_service._store_in_session.assert_called_once()
-        args, kwargs = mock_oauth_service._store_in_session.call_args
+        mock_oauth_service.store_in_session.assert_called_once()
+        args, kwargs = mock_oauth_service.store_in_session.call_args
         _, _, combined_state_arg = args
         # Should end with "unauthenticated" if the user isn't logged in
         assert combined_state_arg == "mocked_state:unauthenticated"
@@ -115,7 +118,7 @@ class TestOAuthCallbackApiBase:
         Patch the oauth_service_class on the Callback Base.
         """
         with patch.object(
-            OAuth2CallbackApiBase, 'oauth_service_class', autospec=True
+            OAuth2CallbackApiBase, "oauth_service_class", autospec=True
         ) as mock_class:
             instance = mock_class.return_value
             instance.get_tokens.return_value = MagicMock(
@@ -142,11 +145,11 @@ class TestOAuthCallbackApiBase:
         # Create a user and generate valid JWT tokens
         user = User.objects.create_user(username="testuser")
         refresh = RefreshToken.for_user(user)
-        combined_state = f"mocked_state:{str(refresh.access_token)}"
+        combined_state = f"mocked_state:{refresh.access_token!s}"
 
         with patch.object(
             MyCallbackView.oauth_service_class,
-            '_retrieve_from_session',
+            "retrieve_from_session",
             return_value=combined_state,
         ):
             request = api_rf.get(
@@ -191,7 +194,7 @@ class TestOAuthCallbackApiBase:
         # We'll store a different state in session than the one provided
         with patch.object(
             MyCallbackView.oauth_service_class,
-            '_retrieve_from_session',
+            "retrieve_from_session",
             return_value="other_state:some_jwt",
         ):
             request = api_rf.get(
@@ -217,7 +220,7 @@ class TestOAuthCallbackApiBase:
         # Combined state has a bogus JWT
         with patch.object(
             MyCallbackView.oauth_service_class,
-            '_retrieve_from_session',
+            "retrieve_from_session",
             return_value="mocked_state:BAD_JWT_TOKEN",
         ):
             request = api_rf.get(
@@ -228,7 +231,9 @@ class TestOAuthCallbackApiBase:
         assert response.status_code == 401
         assert "Could not validate JWT token" in response.data["error"]
 
-    def test_callback_unauthenticated_jwt_creates_none_user(self, api_rf, mock_oauth_service):
+    def test_callback_unauthenticated_jwt_creates_none_user(
+        self, api_rf, mock_oauth_service
+    ):
         """
         If the combined state says `unauthenticated`, the retrieved user is None,
         and we can handle that in update_account (e.g., create a new user).
@@ -246,7 +251,7 @@ class TestOAuthCallbackApiBase:
 
         with patch.object(
             MyCallbackView.oauth_service_class,
-            '_retrieve_from_session',
+            "retrieve_from_session",
             return_value="mocked_state:unauthenticated",
         ):
             request = api_rf.get(

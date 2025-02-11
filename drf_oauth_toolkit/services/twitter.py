@@ -1,25 +1,23 @@
 import base64
 import hashlib
-import hmac
 import logging
 import time
-from typing import Any, Dict
-from urllib.parse import quote
+from typing import Any
+from urllib.parse import parse_qsl
 
 import requests
-from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.crypto import get_random_string
 
-from drf_oauth_toolkit.exceptions import OAuthException, TokenValidationError
-from drf_oauth_toolkit.services.base import OAuth1ServiceBase, OAuth2ServiceBase
+from drf_oauth_toolkit.exceptions import OAuthException
+from drf_oauth_toolkit.models import OAuthRequestToken
+from drf_oauth_toolkit.services.base import OAuth1ServiceBase
+from drf_oauth_toolkit.services.base import OAuth2ServiceBase
 from drf_oauth_toolkit.utils.settings_loader import get_nested_setting
-from drf_oauth_toolkit.utils.types import (
-    OAuth1Credentials,
-    OAuth1Tokens,
-    OAuth2Credentials,
-    OAuth2Tokens,
-)
+from drf_oauth_toolkit.utils.types import OAuth1Credentials
+from drf_oauth_toolkit.utils.types import OAuth1Tokens
+from drf_oauth_toolkit.utils.types import OAuth2Credentials
+from drf_oauth_toolkit.utils.types import OAuth2Tokens
 
 logger = logging.getLogger(__name__)
 
@@ -30,11 +28,11 @@ class TwitterOAuth2Service(OAuth2ServiceBase):
     Handles PKCE, user info, etc.
     """
 
-    API_URI_NAME = "twitter-oauth2-callback"
+    API_URI_NAME = get_nested_setting(["OAUTH_CREDENTIALS", "twitter", "callback_url"])
     AUTHORIZATION_URL = "https://twitter.com/i/oauth2/authorize"
     TOKEN_URL = "https://api.twitter.com/2/oauth2/token"
     USER_INFO_URL = "https://api.twitter.com/2/users/me"
-    SCOPES = ["tweet.read", "users.read", "offline.access", "tweet.write"]
+    SCOPES = ["tweet.read", "users.read", "offline.access"]
 
     def get_credentials(self) -> OAuth2Credentials:
         """
@@ -42,18 +40,25 @@ class TwitterOAuth2Service(OAuth2ServiceBase):
         and return an OAuth2Credentials object.
         """
         client_id = get_nested_setting(["OAUTH_CREDENTIALS", "twitter", "client_id"])
-        client_secret = get_nested_setting(["OAUTH_CREDENTIALS", "twitter", "client_secret"])
+        client_secret = get_nested_setting(
+            ["OAUTH_CREDENTIALS", "twitter", "client_secret"]
+        )
 
         if not client_id or not client_secret:
             raise ImproperlyConfigured("Twitter client ID or secret not set.")
         return OAuth2Credentials(client_id=client_id, client_secret=client_secret)
 
-    def get_authorization_params(self, redirect_uri: str, state: str, request) -> Dict[str, Any]:
+    def get_authorization_params(
+        self, redirect_uri: str, state: str, request
+    ) -> dict[str, Any]:
         """
         Build the OAuth 2 authorization parameters, including PKCE.
         Stores the code_verifier in the session so we can use it
         during the token exchange.
         """
+
+        assert isinstance(self._credentials, OAuth2Credentials)
+
         # Generate code_verifier and code_challenge
         code_verifier = get_random_string(128)
         code_challenge = (
@@ -62,8 +67,7 @@ class TwitterOAuth2Service(OAuth2ServiceBase):
             .rstrip("=")
         )
 
-        # Store the code_verifier in the session so we can retrieve it later
-        self._store_in_session(request, f"{state}_code_verifier", code_verifier)
+        self.store_in_session(request, f"{state}_code_verifier", code_verifier)
 
         return {
             "response_type": "code",
@@ -75,11 +79,13 @@ class TwitterOAuth2Service(OAuth2ServiceBase):
             "code_challenge": code_challenge,
         }
 
-    def get_authorization_headers(self) -> Dict[str, str]:
+    def get_authorization_headers(self) -> dict[str, str]:
         """
         Twitter's OAuth2 token endpoint requires Basic Authorization header
         with the client_id and client_secret.
         """
+
+        assert isinstance(self._credentials, OAuth2Credentials)
         creds = f"{self._credentials.client_id}:{self._credentials.client_secret}"
         basic_credentials = base64.b64encode(creds.encode()).decode()
         return {
@@ -89,12 +95,13 @@ class TwitterOAuth2Service(OAuth2ServiceBase):
 
     def get_token_request_data(
         self, code: str, redirect_uri: str, state: str, request
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Prepare the payload to exchange the authorization code for the tokens.
         Retrieve the PKCE code_verifier from the session, stored previously.
         """
-        code_verifier = self._retrieve_from_session(request, f"{state}_code_verifier")
+        assert isinstance(self._credentials, OAuth2Credentials)
+        code_verifier = self.retrieve_from_session(request, f"{state}_code_verifier")
         return {
             "grant_type": "authorization_code",
             "client_id": self._credentials.client_id,
@@ -105,144 +112,84 @@ class TwitterOAuth2Service(OAuth2ServiceBase):
 
 
 class TwitterOAuth1aService(OAuth1ServiceBase):
-    """
-    Refactored version of your old TwitterOAuth1aService, now using OAuth1ServiceBase.
-    """
-
     REQUEST_TOKEN_URL = "https://api.twitter.com/oauth/request_token"
     AUTHORIZATION_URL = "https://api.twitter.com/oauth/authorize"
     ACCESS_TOKEN_URL = "https://api.twitter.com/oauth/access_token"
     USER_INFO_URL = "https://api.twitter.com/1.1/account/verify_credentials.json"
+    USER_ADS_ACCOUNTS_URL = "https://ads-api.twitter.com/12/accounts"
     API_URI_NAME = "twitter-oauth1a-callback"
 
     def get_credentials(self) -> OAuth1Credentials:
-        """
-        Load the consumer_key and consumer_secret from settings.
-        Return as an OAuth1Credentials object.
-        """
-        consumer_key = getattr(settings, "TWITTER_API_KEY", None)
-        consumer_secret = getattr(settings, "TWITTER_API_SECRET", None)
+        consumer_key = get_nested_setting(["OAUTH_CREDENTIALS", "twitter", "api_key"])
+        consumer_secret = get_nested_setting(
+            ["OAUTH_CREDENTIALS", "twitter", "api_secert"]
+        )
         if not consumer_key or not consumer_secret:
-            raise ImproperlyConfigured("Twitter consumer_key or consumer_secret not set.")
-        return OAuth1Credentials(consumer_key=consumer_key, consumer_secret=consumer_secret)
+            raise ImproperlyConfigured("Twitter API key/secret not configured.")
+        return OAuth1Credentials(
+            consumer_key=consumer_key, consumer_secret=consumer_secret
+        )
 
-    def get_request_token(self, request) -> Dict[str, str]:
-        """
-        Request a temporary oauth_token and oauth_token_secret from Twitter.
-        You can store them in DB or session as needed.
-        """
-        # The parent class implements the logic for signing, but it expects
-        # self._credentials.client_id / client_secret. We’ll override _get_oauth1_params.
-        # Then call super().get_request_token().
-        return super().get_request_token(request)
+    def get_user(self, request):
+        return request.user  # Or custom logic (e.g., session-based user)
+
+    def _save_request_token(self, request, token_data: dict[str, str]):
+        user = self.get_user(request)
+        OAuthRequestToken.objects.create(
+            user=user,
+            request_token=token_data["oauth_token"],
+            request_token_secret=token_data["oauth_token_secret"],
+        )
 
     def get_access_token(self, oauth_token: str, oauth_verifier: str) -> OAuth1Tokens:
-        """
-        Exchange the request token + verifier for an access token.
-        Returns an OAuth1Tokens object containing oauth_token, oauth_token_secret, etc.
-        """
-        return super().get_access_token(oauth_token, oauth_verifier)
+        token_obj = OAuthRequestToken.objects.get(request_token=oauth_token)
+        token_secret = token_obj.request_token_secret
 
-    def get_user_info(self, *, oauth_tokens: OAuth1Tokens | OAuth2Tokens) -> Dict[str, Any]:
-        """
-        Calls verify_credentials with the user's access_token and access_token_secret
-        to retrieve user info from Twitter.
-        """
-        # Build OAuth params for a GET request. We'll replicate the parent's approach
-        # but handle the signed request ourselves if we want to do custom logic:
-        method = "GET"
-        url = self.USER_INFO_URL
-        if not isinstance(oauth_tokens, OAuth1Tokens):
-            raise TokenValidationError()
-
-        oauth_params = {
-            "oauth_consumer_key": self._credentials.consumer_key,
-            "oauth_token": oauth_tokens.oauth_token,
-            "oauth_nonce": base64.b64encode(get_random_string(32).encode()).decode(),
-            "oauth_signature_method": "HMAC-SHA1",
-            "oauth_timestamp": str(int(time.time())),
-            "oauth_version": "1.0",
-        }
-        # Build signature using the user's access_token_secret
-        signature = self._generate_oauth_signature(
-            method, url, oauth_params, oauth_tokens.oauth_token_secret
+        oauth_params = self._get_oauth1_params()
+        oauth_params.update(
+            {"oauth_token": oauth_token, "oauth_verifier": oauth_verifier}
         )
-        oauth_params["oauth_signature"] = signature
+
+        oauth_params["oauth_signature"] = self._generate_oauth_signature(
+            method="POST",
+            url=self.ACCESS_TOKEN_URL,
+            params=oauth_params,
+            token_secret=token_secret,
+        )
 
         headers = {"Authorization": f"OAuth {self._format_oauth_header(oauth_params)}"}
-        response = requests.get(url, headers=headers)
+        response = requests.post(self.ACCESS_TOKEN_URL, headers=headers)
         if not response.ok:
-            raise OAuthException(f"Failed to obtain user info: {response.text}")
+            raise OAuthException(f"Failed to get access token: {response.text}")
 
-        return response.json()
+        token_data = dict(parse_qsl(response.text))
+        return OAuth1Tokens(
+            oauth_token=token_data["oauth_token"],
+            oauth_token_secret=token_data["oauth_token_secret"],
+            user_id=token_data.get("user_id"),
+            screen_name=token_data.get("screen_name"),
+        )
 
-    # Optional method if you need Ads Accounts:
-    def get_user_ads_accounts(self, oauth_tokens: OAuth1Tokens) -> Dict[str, Any]:
-        """
-        Example of an additional call to Twitter Ads API (v12).
-        """
-        ads_url = "https://ads-api.twitter.com/12/accounts"
-        method = "GET"
-
-        oauth_params = {
+    def get_user_info(
+        self, *, oauth_tokens: OAuth1Tokens | OAuth2Tokens
+    ) -> dict[str, Any]:
+        # Twitter-specific API call (not part of the base class)
+        assert isinstance(self._credentials, OAuth1Credentials)
+        assert isinstance(oauth_tokens, OAuth1Tokens)
+        params = {
             "oauth_consumer_key": self._credentials.consumer_key,
             "oauth_token": oauth_tokens.oauth_token,
-            "oauth_nonce": base64.b64encode(get_random_string(32).encode()).decode(),
+            "oauth_nonce": self._generate_nonce(),
             "oauth_signature_method": "HMAC-SHA1",
             "oauth_timestamp": str(int(time.time())),
             "oauth_version": "1.0",
         }
-        signature = self._generate_oauth_signature(
-            method, ads_url, oauth_params, oauth_tokens.oauth_token_secret
+        params["oauth_signature"] = self._generate_oauth_signature(
+            method="GET",
+            url=self.USER_INFO_URL,
+            params=params,
+            token_secret=oauth_tokens.oauth_token_secret,
         )
-        oauth_params["oauth_signature"] = signature
-
-        headers = {"Authorization": f"OAuth {self._format_oauth_header(oauth_params)}"}
-        response = requests.get(ads_url, headers=headers)
-        if not response.ok:
-            raise OAuthException(f"Failed to obtain user ads accounts: {response.text}")
-
+        headers = {"Authorization": f"OAuth {self._format_oauth_header(params)}"}
+        response = requests.get(self.USER_INFO_URL, headers=headers)
         return response.json()
-
-    def _get_oauth1_params(self, callback_url: str = "") -> Dict[str, str]:
-        """
-        Override the parent's method to return the correct dict keys for consumer_key/secret.
-        Notice the base expects self._credentials.client_id, but we have consumer_key.
-        """
-        return {
-            "oauth_consumer_key": self._credentials.consumer_key,
-            "oauth_nonce": base64.b64encode(get_random_string(32).encode()).decode(),
-            "oauth_signature_method": "HMAC-SHA1",
-            "oauth_timestamp": str(int(time.time())),
-            "oauth_version": "1.0",
-            "oauth_callback": callback_url,
-        }
-
-    def _generate_oauth_signature(
-        self,
-        method: str,
-        url: str,
-        params: Dict[str, str],
-        token_secret: str = "",
-    ) -> str:
-        """
-        Override if you need to incorporate the token_secret when signing the request.
-        The parent class only uses self._credentials.consumer_secret + '&'.
-        We append the token_secret if available.
-        """
-        sorted_params = "&".join(
-            f"{quote(k, safe='')}={quote(v, safe='')}" for k, v in sorted(params.items())
-        )
-        base_string = f"{method.upper()}&{quote(url, safe='')}&{quote(sorted_params, safe='')}"
-        signing_key = f"{self._credentials.consumer_secret}&{token_secret}"
-
-        signature = hmac.new(
-            signing_key.encode("utf-8"), base_string.encode("utf-8"), hashlib.sha1
-        ).digest()
-        return base64.b64encode(signature).decode("utf-8")
-
-    def _format_oauth_header(self, params: Dict[str, str]) -> str:
-        """
-        Typically the same as the parent's approach, but you can override for custom encoding.
-        """
-        return ", ".join(f'{k}="{quote(v, safe="")}"' for k, v in params.items())

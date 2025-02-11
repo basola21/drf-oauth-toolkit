@@ -28,9 +28,10 @@ class EncryptedField(models.TextField):
 
         try:
             self.fernet.decrypt(value.encode())
-            return value
         except Exception:
             return self.fernet.encrypt(value.encode()).decode()
+        else:
+            return value
 
     def from_db_value(self, value, expression, connection):
         """

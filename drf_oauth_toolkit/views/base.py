@@ -1,15 +1,19 @@
 import logging
-from typing import Dict
 
 from django.contrib.auth import get_user_model
-from rest_framework import serializers, status
+from rest_framework import serializers
+from rest_framework import status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
-from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
+from rest_framework_simplejwt.tokens import AccessToken
+from rest_framework_simplejwt.tokens import RefreshToken
 
-from drf_oauth_toolkit.exceptions import CSRFValidationError, OAuthException, TokenValidationError
+from drf_oauth_toolkit.exceptions import CSRFValidationError
+from drf_oauth_toolkit.exceptions import OAuthException
+from drf_oauth_toolkit.exceptions import TokenValidationError
 from drf_oauth_toolkit.models import OAuthRequestToken
-from drf_oauth_toolkit.services.base import OAuth1ServiceBase, OAuth2ServiceBase
+from drf_oauth_toolkit.services.base import OAuth1ServiceBase
+from drf_oauth_toolkit.services.base import OAuth2ServiceBase
 from drf_oauth_toolkit.utils.commons import PublicApi
 from drf_oauth_toolkit.utils.types import OAuth2Tokens
 
@@ -43,7 +47,7 @@ class OAuth2RedirectApiBase(PublicApi):
         Subclass can override to customize how state is stored in session.
         """
         oauth_service = self.oauth_service_class()
-        oauth_service._store_in_session(request, self.session_state_key, state)
+        oauth_service.store_in_session(request, self.session_state_key, state)
 
     def build_state_value(self, request, state: str) -> str:
         """
@@ -71,7 +75,9 @@ class OAuth2RedirectApiBase(PublicApi):
 
         self.store_state_in_session(request, combined_state)
 
-        return Response({"authorization_url": authorization_url}, status=status.HTTP_200_OK)
+        return Response(
+            {"authorization_url": authorization_url}, status=status.HTTP_200_OK
+        )
 
 
 class OAuth2CallbackApiBase(PublicApi):
@@ -113,13 +119,16 @@ class OAuth2CallbackApiBase(PublicApi):
         """
         input_serializer = self.InputSerializer(data=request.GET)
         input_serializer.is_valid(raise_exception=True)
-        validated_data: Dict = input_serializer.validated_data
+        validated_data: dict = input_serializer.validated_data
 
         error_response = self._handle_initial_errors(validated_data)
         if error_response:
             return error_response
 
         state, code = validated_data.get("state"), validated_data.get("code")
+
+        if not code:
+            raise OAuthException
 
         try:
             jwt_token = self._validate_state_token(request, state)
@@ -129,10 +138,11 @@ class OAuth2CallbackApiBase(PublicApi):
 
         oauth_service = self.oauth_service_class()
         try:
-            oauth_tokens = oauth_service.get_tokens(code=code, state=state, request=request)
+            oauth_tokens = oauth_service.get_tokens(
+                code=code, state=state, request=request
+            )
         except Exception as e:
-            logger.exception(f"OAuth flow failed: {e}")
-            raise OAuthException()
+            raise OAuthException from e
 
         user = self.update_account(user, oauth_tokens)
         oauth_tokens = self.update_oauth_tokens(user) or oauth_tokens
@@ -141,11 +151,12 @@ class OAuth2CallbackApiBase(PublicApi):
 
     def update_oauth_tokens(self, user):
         if not user:
-            raise NotImplementedError(f"Subclasses must pass a user object not {type(user)}")
+            raise NotImplementedError(
+                f"Subclasses must pass a user object not {type(user)}"
+            )
         refresh_token = RefreshToken.for_user(user)
         access_token = refresh_token.access_token
-        tokens = OAuth2Tokens(str(access_token), str(refresh_token))
-        return tokens
+        return OAuth2Tokens(str(access_token), str(refresh_token))
 
     def _handle_initial_errors(self, validated_data):
         """
@@ -160,7 +171,7 @@ class OAuth2CallbackApiBase(PublicApi):
         """
         Retrieve the combined state from session, then compare & extract the JWT.
         """
-        session_state = self.oauth_service_class._retrieve_from_session(
+        session_state = self.oauth_service_class.retrieve_from_session(
             request, self.session_state_key
         )
         state_value, jwt_token = session_state.split(":")
@@ -179,8 +190,10 @@ class OAuth2CallbackApiBase(PublicApi):
             decoded_token = AccessToken(jwt_token)
             user_id = decoded_token["user_id"]
             return User.objects.get(id=user_id)
-        except (User.DoesNotExist, Exception):
-            raise TokenValidationError("Could not validate JWT token to retrieve user.")
+        except (User.DoesNotExist, Exception) as e:
+            raise TokenValidationError(
+                "Could not validate JWT token to retrieve user."
+            ) from e
 
     def generate_success_response(self, oauth_tokens, **kwargs):
         """
@@ -200,7 +213,7 @@ class OAuth1RedirectApiBase(PublicApi):
     oauth_service_class = OAuth1ServiceBase
     session_token_key = "oauth1_temp_token"
 
-    def store_request_token(self, request, token_data: Dict[str, str]) -> None:
+    def store_request_token(self, request, token_data: dict[str, str]) -> None:
         OAuthRequestToken.objects.store_token(
             user=request.user if request.user.is_authenticated else None,
             request_token=token_data["oauth_token"],
@@ -225,7 +238,9 @@ class OAuth1RedirectApiBase(PublicApi):
         oauth_token = token_data["oauth_token"]
         authorization_url = self.build_authorization_url(oauth_token)
 
-        return Response({"authorization_url": authorization_url}, status=status.HTTP_200_OK)
+        return Response(
+            {"authorization_url": authorization_url}, status=status.HTTP_200_OK
+        )
 
 
 class OAuth1CallbackApiBase(PublicApi):
@@ -237,7 +252,9 @@ class OAuth1CallbackApiBase(PublicApi):
         oauth_verifier = serializers.CharField(required=False)
         error = serializers.CharField(required=False)
 
-    def retrieve_request_token(self, request, incoming_oauth_token: str) -> Dict[str, str]:
+    def retrieve_request_token(
+        self, request, incoming_oauth_token: str
+    ) -> dict[str, str]:
         token = OAuthRequestToken.objects.get(request_token=incoming_oauth_token)
 
         if token.user and request.user != token.user:
@@ -253,7 +270,6 @@ class OAuth1CallbackApiBase(PublicApi):
         Hook for subclasses to store or link final tokens with a user account or model.
         By default, does nothing.
         """
-        pass
 
     def generate_success_response(self, oauth_tokens):
         """
