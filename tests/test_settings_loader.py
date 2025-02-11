@@ -1,7 +1,8 @@
 import pytest
 from django.test import override_settings
 
-from drf_oauth_toolkit.utils.settings_loader import SettingNotFoundError, get_nested_setting
+from drf_oauth_toolkit.utils.settings_loader import SettingNotFoundError
+from drf_oauth_toolkit.utils.settings_loader import get_nested_setting
 
 
 def test_get_nested_setting_success():
@@ -16,7 +17,10 @@ def test_get_nested_setting_success():
             },
         }
     ):
-        assert get_nested_setting(["OAUTH_CREDENTIALS", "google", "client_id"]) == "test-client-id"
+        assert (
+            get_nested_setting(["OAUTH_CREDENTIALS", "google", "client_id"])
+            == "test-client-id"
+        )
 
 
 def test_get_nested_setting_error():
@@ -41,6 +45,8 @@ def test_get_nested_setting_missing_key():
     """Test missing key returns default."""
     with override_settings(OAUTH_CREDENTIALS={}):
         assert (
-            get_nested_setting(["OAUTH_CREDENTIALS", "invalid_key"], default="not-found")
+            get_nested_setting(
+                ["OAUTH_CREDENTIALS", "invalid_key"], default="not-found"
+            )
             == "not-found"
         )

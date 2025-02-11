@@ -1,4 +1,5 @@
-from rest_framework.exceptions import APIException, NotFound
+from rest_framework.exceptions import APIException
+from rest_framework.exceptions import NotFound
 
 
 class NotFoundError(NotFound):
@@ -25,7 +26,8 @@ class SettingNotFoundError(Exception):
 
         Args:
             setting_key (str): The key that was not found in the settings.
-            message (str, optional): Custom error message. Defaults to a standard message.
+            message (str, optional): Custom error message.
+            if not provided Defaults to a standard message.
         """
         self.setting_key = setting_key
         self.message = message or f"Required setting '{setting_key}' not found."
