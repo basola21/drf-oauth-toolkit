@@ -25,6 +25,28 @@ logger = logging.getLogger(__name__)
 
 
 class OAuth2ServiceBase(OAuthBase):
+    """
+    Base class for implementing OAuth2 authentication flows.
+    This class provides the core functionality for OAuth2
+    authorization code grant type with optional PKCE support.
+
+    Required Class Attributes:
+        TOKEN_URL (str): The OAuth2 token endpoint URL
+        SCOPES (list): List of permission scopes to request
+        AUTHORIZATION_URL (str): The OAuth2 authorization endpoint URL
+        USER_INFO_URL (str): Endpoint for retrieving user information
+
+    Usage:
+        Subclass this base class and implement the required methods to create a specific
+        OAuth2 provider integration (e.g., Google, Twitter OAuth2).
+
+    Example:
+        class GoogleOAuth2Service(OAuth2ServiceBase):
+            TOKEN_URL = "https://oauth2.googleapis.com/token"
+            SCOPES = ["profile", "email"]
+            # ... implement required methods
+    """
+
     TOKEN_URL: str
     SCOPES: list
 
@@ -32,6 +54,17 @@ class OAuth2ServiceBase(OAuthBase):
         self._credentials = self.get_credentials()
 
     def get_authorization_url(self, request) -> tuple[str, str]:
+        """
+        Generates the OAuth2 authorization URL and state parameter.
+
+        Args:
+            request: The HTTP request object
+
+        Returns:
+            tuple: (authorization_url, state)
+                - authorization_url: Full URL for redirecting user to OAuth provider
+                - state: Random state token for CSRF protection
+        """
         redirect_uri = self._get_redirect_uri()
         state = self._generate_state_session_token()
         params = self.get_authorization_params(redirect_uri, state, request)
@@ -46,6 +79,20 @@ class OAuth2ServiceBase(OAuthBase):
         return "".join(rand.choice(chars) for _ in range(length))
 
     def get_tokens(self, *, code: str, state, request) -> OAuth2Tokens:
+        """
+        Exchanges an authorization code for access and refresh tokens.
+
+        Args:
+            code: Authorization code received from OAuth provider
+            state: State parameter to verify against CSRF attacks
+            request: The HTTP request object
+
+        Returns:
+            OAuth2Tokens: Object containing access_token, refresh_token, and id_token
+
+        Raises:
+            OAuthException: If token request fails
+        """
         redirect_uri = self._get_redirect_uri()
         data = self.get_token_request_data(code, redirect_uri, state, request)
         headers = self.get_authorization_headers()
@@ -93,6 +140,20 @@ class OAuth2ServiceBase(OAuthBase):
         oauth_tokens: OAuth1Tokens | OAuth2Tokens,
         parameters: dict | None = None,
     ) -> dict[str, Any]:
+        """
+        Retrieves user information from the OAuth provider's userinfo endpoint.
+
+        Args:
+            oauth_tokens: OAuth2Tokens object containing valid access token
+            parameters: Optional additional parameters for the userinfo request
+
+        Returns:
+            dict: User information from the provider
+
+        Raises:
+            OAuthException: If userinfo request fails or URL not configured
+            TokenValidationError: If invalid token type provided
+        """
         if not parameters:
             parameters = {}
         if not self.USER_INFO_URL:
@@ -124,6 +185,26 @@ class OAuth2ServiceBase(OAuthBase):
 
 
 class OAuth1ServiceBase(OAuthBase):
+    """
+    Base class for implementing OAuth1.0a authentication flows.
+    Provides core functionality for the three-legged
+    OAuth1 authentication process.
+
+    Required Class Attributes:
+        REQUEST_TOKEN_URL (str): URL for obtaining request tokens
+        ACCESS_TOKEN_URL (str): URL for exchanging request tokens for access tokens
+        AUTHORIZATION_URL (str): URL for user authorization
+
+    Usage:
+        Subclass this base class and implement the required methods to create a specific
+        OAuth1.0a provider integration (e.g., Twitter OAuth1.0a).
+
+    Example:
+        class TwitterOAuth1Service(OAuth1ServiceBase):
+            REQUEST_TOKEN_URL = "https://api.twitter.com/oauth/request_token"
+            # ... implement required methods
+    """
+
     REQUEST_TOKEN_URL: str
     ACCESS_TOKEN_URL: str
     AUTHORIZATION_URL: str
@@ -132,6 +213,18 @@ class OAuth1ServiceBase(OAuthBase):
         self._credentials = self.get_credentials()
 
     def get_request_token(self, request) -> dict[str, str]:
+        """
+        Obtains OAuth1 request token from the provider.
+
+        Args:
+            request: The HTTP request object
+
+        Returns:
+            dict: Contains oauth_token and oauth_token_secret
+
+        Raises:
+            OAuthException: If request token retrieval fails
+        """
         oauth_params = self._get_oauth1_params(callback_url=self._get_redirect_uri())
         oauth_params["oauth_signature"] = self._generate_oauth_signature(
             method="POST",
@@ -149,7 +242,17 @@ class OAuth1ServiceBase(OAuthBase):
 
     def get_access_token(self, oauth_token: str, oauth_verifier: str) -> OAuth1Tokens:
         """
-        Retrieve the stored token secret from DB, then request an access token.
+        Exchanges request token for access token after user authorization.
+
+        Args:
+            oauth_token: OAuth token from callback
+            oauth_verifier: OAuth verifier from callback
+
+        Returns:
+            OAuth1Tokens: Object containing oauth_token and oauth_token_secret
+
+        Raises:
+            OAuthException: If token exchange fails or token not found
         """
         try:
             token_obj = OAuth1Token.objects.get(request_token=oauth_token)
@@ -183,6 +286,18 @@ class OAuth1ServiceBase(OAuthBase):
     def _generate_oauth_signature(
         self, method: str, url: str, params: dict[str, str], token_secret: str = ""
     ) -> str:
+        """
+        Generates OAuth1.0a signature for requests.
+
+        Args:
+            method: HTTP method (GET, POST, etc.)
+            url: Request URL
+            params: OAuth parameters
+            token_secret: Token secret for signature (empty for request token)
+
+        Returns:
+            str: Base64 encoded HMAC-SHA1 signature
+        """
         assert isinstance(self._credentials, OAuth1Credentials), (
             "Credentials must be of type OAuth1Credentials"
         )
